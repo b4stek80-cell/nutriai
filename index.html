@@ -511,6 +511,90 @@
   }
   .kofi-btn:active { opacity: 0.85; transform: scale(0.98); }
 
+  /* MIKRO PANEL */
+  .mikro-panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+  .mikro-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .mikro-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 9px;
+  }
+  .mikro-row:last-child { margin-bottom: 0; }
+  .mikro-name {
+    font-size: 11px;
+    color: var(--text2);
+    width: 90px;
+    flex-shrink: 0;
+  }
+  .mikro-bar-wrap {
+    flex: 1;
+    height: 8px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 4px;
+    overflow: visible;
+    position: relative;
+  }
+  .mikro-bar {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.6s ease;
+    min-width: 3px;
+  }
+  .mikro-bar.ok    { background: var(--green); }
+  .mikro-bar.low   { background: var(--orange); }
+  .mikro-bar.high  { background: #60a5fa; }
+  .mikro-bar.warn  { background: var(--red); }
+  .mikro-val {
+    font-size: 11px;
+    font-weight: 600;
+    width: 52px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+  .mikro-val.ok   { color: var(--green); }
+  .mikro-val.low  { color: var(--orange); }
+  .mikro-val.high { color: #60a5fa; }
+  .mikro-val.warn { color: var(--red); }
+  .norma-mark {
+    position: absolute;
+    right: 0; top: -2px;
+    width: 2px; height: 12px;
+    background: rgba(255,255,255,0.3);
+    border-radius: 1px;
+  }
+  .mikro-status-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255,255,255,0.05);
+  }
+  .mikro-badge {
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 20px;
+    font-weight: 600;
+  }
+  .mikro-badge.ok   { background: rgba(52,211,153,0.12); color: var(--green); }
+  .mikro-badge.warn { background: rgba(251,146,60,0.12);  color: var(--orange); }
+  .mikro-badge.bad  { background: rgba(248,113,113,0.12); color: var(--red); }
+
   /* SAVED */
   .saved-item {
     background: var(--card);
@@ -732,10 +816,12 @@ function showToast(msg) {
 }
 
 const loaderMessages = [
-  'Obliczam Twoje zapotrzebowanie kaloryczne...',
-  'Dobieram składniki odżywcze...',
-  'Układam plan posiłków...',
-  'Optymalizuję jadłospis...',
+  'Obliczam zapotrzebowanie kaloryczne...',
+  'Dobieram składniki z bazy IŻŻ...',
+  'Układam zróżnicowany plan posiłków...',
+  'Weryfikuję wartości odżywcze...',
+  'Analizuję mikroskładniki...',
+  'Porównuję z normami IŻŻ... 🔬',
   'Prawie gotowe! 🌿',
 ];
 
@@ -796,13 +882,31 @@ async function generate() {
   try {
     document.getElementById('loaderText').textContent = 'Generuję jadłospis...';
 
-    const prompt = `Jadłospis na ${days} dni. Osoba: ${gender}, ${age} lat, ${height} cm, ${weight} kg, aktywność: ${activity}, cel: ${goal}, dieta: ${diet}, ${meals} posiłków/dzień${allergies ? ', bez: '+allergies : ''}. Zwróć JSON: {"kcal_dziennie":number,"bialko_g":number,"tluszcze_g":number,"weglowodany_g":number,"dni":[{"dzien":"string","posilki":[{"pora":"string","nazwa":"string","skladniki":["np. płatki owsiane 60g","mleko 2% 200ml"],"kcal":number,"bialko_g":number,"tluszcze_g":number,"weglowodany_g":number}]}],"wskazowki":["string"]}. Nazwy posiłków max 5 słów. Składniki z dokładnymi gramaturami i szczegółami (np. mleko 2% vs odtłuszczone, makaron pełnoziarnisty vs zwykły). 3 wskazówki.`;
+    // Lista produktów z bazy do użycia w składnikach
+    const bazaHint = "pierś z kurczaka, udo z kurczaka, indyk pierś, wołowina chuda, łosoś, tuńczyk w wodzie, dorsz, makrela, jajko, mleko 2%, mleko 3.2%, mleko odtłuszczone, mleko sojowe, mleko owsiane, jogurt naturalny, jogurt grecki, skyr, ser twarogowy chudy, ser twarogowy półtłusty, ser żółty, mozzarella, feta, serek wiejski, kefir, maślanka, ryż biały, ryż brązowy, makaron pszenny, makaron pełnoziarnisty, kasza gryczana, kasza jaglana, kasza bulgur, płatki owsiane, quinoa, chleb żytni, chleb graham, tortilla pszenna, ziemniaki, bataty, marchew, brokuł, szpinak, pomidor, ogórek, papryka czerwona, cebula, czosnek, kapusta biała, sałata, kukurydza, groszek zielony, buraki, cukinia, jarmuż, szparagi, grzyby pieczarki, fasola szparagowa, brukselka, jabłko, banan, pomarańcza, truskawki, borówki, kiwi, awokado, soczewica czerwona, soczewica zielona, ciecierzyca, fasola czerwona, fasola biała, tofu, tempeh, edamame, migdały, orzechy włoskie, nasiona dyni, siemię lniane, nasiona chia, masło orzechowe, oliwa z oliwek, olej rzepakowy, miód";
+
+    const prompt = `Ułóż profesjonalny jadłospis na ${days} dni dla osoby: ${gender}, ${age} lat, ${height} cm, ${weight} kg, aktywność: ${activity}, cel: ${goal}, dieta: ${diet}, ${meals} posiłków/dzień${allergies ? ', wykluczone: '+allergies : ''}.
+
+Zasady:
+1. Każdy dzień musi być inny — nie powtarzaj tych samych posiłków
+2. Używaj DOKŁADNIE tych nazw składników (baza IŻŻ): ${bazaHint}
+3. Podaj gramaturę każdego składnika (np. "płatki owsiane 60g", "mleko 2% 200ml")
+4. Zbilansuj makroskładniki do celu osoby
+5. Uwzględnij różnorodność grup produktów w ciągu tygodnia
+
+Zwróć TYLKO JSON:
+{"kcal_dziennie":number,"bialko_g":number,"tluszcze_g":number,"weglowodany_g":number,"dni":[{"dzien":"string","posilki":[{"pora":"string","nazwa":"string","skladniki":["składnik gramatura"],"kcal":number,"bialko_g":number,"tluszcze_g":number,"weglowodany_g":number}]}],"wskazowki":["string","string","string","string","string"]}
+
+Nazwy posiłków max 5 słów. 5 praktycznych wskazówek żywieniowych dopasowanych do celu osoby.`;
 
     const json = await callGemini(prompt);
     clearInterval(msgInterval);
 
-    currentResult = { json, params: { age, gender, height, weight, goal, diet, days }, date: new Date().toLocaleDateString('pl') };
-    renderResult(json);
+    document.getElementById('loaderText').textContent = 'Weryfikuję wartości odżywcze...';
+    const jsonWzbogacony = await wzbogacMakrami(json);
+
+    currentResult = { json: jsonWzbogacony, params: { age, gender, height, weight, goal, diet, days }, date: new Date().toLocaleDateString('pl') };
+    renderResult(jsonWzbogacony);
 
   } catch(e) {
     clearInterval(msgInterval);
@@ -838,8 +942,30 @@ function renderResult(json) {
       <div class="summary-stat"><div class="summary-val">${json.bialko_g}g</div><div class="summary-lbl">Białko</div></div>
       <div class="summary-stat"><div class="summary-val">${json.tluszcze_g}g</div><div class="summary-lbl">Tłuszcze</div></div>
       <div class="summary-stat"><div class="summary-val">${json.weglowodany_g}g</div><div class="summary-lbl">Węglowodany</div></div>
-    </div>`;
+    </div>
+    ${json.mikro ? `
+    <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.07)">
+      <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--text2);margin-bottom:10px">🔬 Mikroskładniki / dzień</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        <span style="font-size:11px;padding:3px 9px;border-radius:20px;background:rgba(52,211,153,0.1);color:#6ee7b7">Ca: ${json.mikro.wapn_mg}mg</span>
+        <span style="font-size:11px;padding:3px 9px;border-radius:20px;background:rgba(248,113,113,0.1);color:#fca5a5">Fe: ${json.mikro.zelazo_mg}mg</span>
+        <span style="font-size:11px;padding:3px 9px;border-radius:20px;background:rgba(124,106,247,0.1);color:var(--accent2)">Mg: ${json.mikro.magnez_mg}mg</span>
+        <span style="font-size:11px;padding:3px 9px;border-radius:20px;background:rgba(251,146,60,0.1);color:#fdba74">K: ${json.mikro.potas_mg}mg</span>
+        <span style="font-size:11px;padding:3px 9px;border-radius:20px;background:rgba(250,204,21,0.1);color:#fde047">Wit.C: ${json.mikro.vit_c_mg}mg</span>
+        <span style="font-size:11px;padding:3px 9px;border-radius:20px;background:rgba(251,146,60,0.1);color:#fdba74">Wit.A: ${json.mikro.vit_a_ug}µg</span>
+        <span style="font-size:11px;padding:3px 9px;border-radius:20px;background:rgba(250,204,21,0.1);color:#fde047">Wit.D: ${json.mikro.vit_d_ug}µg</span>
+        <span style="font-size:11px;padding:3px 9px;border-radius:20px;background:rgba(52,211,153,0.1);color:#6ee7b7">Wit.B12: ${json.mikro.vit_b12_ug}µg</span>
+        <span style="font-size:11px;padding:3px 9px;border-radius:20px;background:rgba(124,106,247,0.1);color:var(--accent2)">Fol.: ${json.mikro.folany_ug}µg</span>
+        <span style="font-size:11px;padding:3px 9px;border-radius:20px;background:rgba(248,113,113,0.1);color:#fca5a5">Zn: ${json.mikro.cynk_mg}mg</span>
+      </div>
+    </div>` : ''}
+  `;
   area.appendChild(summary);
+
+  // Panel mikroskładników z normami IŻŻ
+  if (json.mikro && currentResult?.params) {
+    area.appendChild(renderMikroPanel(json, currentResult.params));
+  }
 
   // Action buttons
   const actions = document.createElement('div');
@@ -882,6 +1008,8 @@ function renderResult(json) {
         <span class="macro p">B: ${m.bialko_g}g</span>
         <span class="macro f">T: ${m.tluszcze_g}g</span>
         <span class="macro">W: ${m.weglowodany_g}g</span>
+        ${m.blonnik_g ? `<span class="macro" style="background:rgba(52,211,153,0.08);color:#6ee7b7">Błon: ${m.blonnik_g}g</span>` : ''}
+        ${m.zrodlo_makr === 'baza' ? `<span class="macro" style="background:rgba(52,211,153,0.05);color:#6ee7b7;font-size:9px">✓ IŻŻ/USDA</span>` : `<span class="macro" style="font-size:9px;opacity:0.5">~AI</span>`}
       </div>`;
 
       if (recipeMode !== 'none') {
@@ -1004,6 +1132,35 @@ function exportToFile() {
 
   const wskazowkiHtml = (j.wskazowki||[]).map(w => `<div class="tip">💡 ${w}</div>`).join('');
 
+  // Sekcja mikroskładników do wydruku
+  const n = getNormy(params.gender, params.age);
+  const m = j.mikro || {};
+  const r2 = v => Math.round(v*10)/10;
+  const mikroDane = [
+    { label:'Wapń',       war: r2(m.wapn_mg||0),    norma: n.wapn,    jedn:'mg' },
+    { label:'Żelazo',     war: r2(m.zelazo_mg||0),  norma: n.zelazo,  jedn:'mg' },
+    { label:'Magnez',     war: r2(m.magnez_mg||0),  norma: n.magnez,  jedn:'mg' },
+    { label:'Wit. C',     war: r2(m.vit_c_mg||0),   norma: n.vit_c,   jedn:'mg' },
+    { label:'Wit. D',     war: r2(m.vit_d_ug||0),   norma: n.vit_d,   jedn:'µg' },
+    { label:'Wit. B12',   war: r2(m.vit_b12_ug||0), norma: n.vit_b12, jedn:'µg' },
+    { label:'Kw. foliowy',war: r2(m.folany_ug||0),  norma: n.fol,     jedn:'µg' },
+    { label:'Błonnik',    war: r2(j.blonnik_g||0),  norma: n.blonnik, jedn:'g'  },
+    { label:'Cynk',       war: r2(m.cynk_mg||0),    norma: n.cynk,    jedn:'mg' },
+  ];
+  const mikroHtml = mikroDane.map(d => {
+    const pct = d.norma > 0 ? Math.min(Math.round((d.war/d.norma)*100), 130) : 0;
+    const barW = Math.min(pct, 100);
+    const kolor = pct >= 100 ? '#1a7a52' : pct >= 70 ? '#b45309' : '#dc2626';
+    const status = pct >= 100 ? '✅' : pct >= 70 ? '⚠️' : '❌';
+    return `<tr>
+      <td style="padding:5px 8px;font-size:12px;color:#444;">${status} ${d.label}</td>
+      <td style="padding:5px 8px;"><div style="background:#eee;border-radius:4px;height:8px;width:100%;"><div style="background:${kolor};width:${barW}%;height:100%;border-radius:4px;"></div></div></td>
+      <td style="padding:5px 8px;font-size:12px;font-weight:700;color:${kolor};">${d.war}${d.jedn}</td>
+      <td style="padding:5px 8px;font-size:11px;color:#999;">norma: ${d.norma}${d.jedn}</td>
+      <td style="padding:5px 8px;font-size:12px;color:${kolor};">${pct}%</td>
+    </tr>`;
+  }).join('');
+
   const html = `<!DOCTYPE html>
 <html lang="pl">
 <head>
@@ -1015,10 +1172,14 @@ function exportToFile() {
   .header { text-align: center; border-bottom: 3px solid #7c6af7; padding-bottom: 16px; margin-bottom: 24px; }
   .header h1 { color: #7c6af7; margin: 0 0 6px; font-size: 26px; }
   .header p { color: #666; font-size: 13px; margin: 0; }
-  .summary { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; background: #f5f3ff; border-radius: 10px; padding: 16px; margin-bottom: 24px; }
+  .summary { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; background: #f5f3ff; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
   .stat { text-align: center; }
   .stat-val { font-size: 22px; font-weight: 700; color: #7c6af7; }
   .stat-lbl { font-size: 11px; color: #888; margin-top: 2px; }
+  .mikro-section { margin-bottom: 24px; }
+  .mikro-section h3 { color: #7c6af7; font-size: 14px; margin-bottom: 8px; }
+  .mikro-table { width: 100%; border-collapse: collapse; }
+  .mikro-table td:nth-child(2) { width: 120px; }
   .day { border: 1px solid #e0e0e0; border-radius: 10px; margin-bottom: 16px; overflow: hidden; page-break-inside: avoid; }
   .day-header { background: #f0eeff; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; }
   .day-name { font-weight: 700; color: #7c6af7; font-size: 15px; }
@@ -1044,7 +1205,7 @@ function exportToFile() {
 <body>
   <div class="header">
     <h1>🥗 NutriAI — Plan Żywieniowy</h1>
-    <p>Wygenerowano: ${date} &nbsp;|&nbsp; Cel: ${params.goal} &nbsp;|&nbsp; Dieta: ${params.diet} &nbsp;|&nbsp; ${params.days} dni</p>
+    <p>Wygenerowano: ${date} &nbsp;|&nbsp; Cel: ${params.goal} &nbsp;|&nbsp; Dieta: ${params.diet} &nbsp;|&nbsp; ${params.days} dni &nbsp;|&nbsp; ${params.gender}, ${params.age} lat</p>
   </div>
   <div class="summary">
     <div class="stat"><div class="stat-val">${j.kcal_dziennie}</div><div class="stat-lbl">kcal / dzień</div></div>
@@ -1052,9 +1213,14 @@ function exportToFile() {
     <div class="stat"><div class="stat-val">${j.tluszcze_g}g</div><div class="stat-lbl">Tłuszcze</div></div>
     <div class="stat"><div class="stat-val">${j.weglowodany_g}g</div><div class="stat-lbl">Węglowodany</div></div>
   </div>
+  ${m.wapn_mg !== undefined ? `
+  <div class="mikro-section">
+    <h3>🔬 Analiza mikroskładników (średnia dzienna · normy IŻŻ)</h3>
+    <table class="mikro-table">${mikroHtml}</table>
+  </div>` : ''}
   ${dniHtml}
   ${wskazowkiHtml ? `<div class="tips"><h3>Wskazówki żywieniowe</h3>${wskazowkiHtml}</div>` : ''}
-  <div class="footer">Wygenerowano przez NutriAI &nbsp;·&nbsp; ko-fi.com/b4stek</div>
+  <div class="footer">Wygenerowano przez NutriAI &nbsp;·&nbsp; Źródło danych: IŻŻ / USDA FoodData Central &nbsp;·&nbsp; ko-fi.com/b4stek</div>
 </body>
 </html>`;
 
@@ -1077,6 +1243,502 @@ function shareResult() {
     navigator.clipboard.writeText(text);
     showToast('📋 Skopiowano do schowka');
   }
+}
+// ============================================================
+// BAZA LOKALNA — wartości na 100g (źródło: IŻŻ / USDA)
+// ============================================================
+const FOOD_DB = {
+
+  // ===== MIĘSO =====
+  "pierś z kurczaka":        {kcal:110,b:23.1,t:1.8, w:0.0, bl:0,  wap:11, ze:0.7, mag:29, k:256, vit_c:0,  vit_a:8,  vit_d:0.1,vit_b12:0.3,fol:4,  zn:1.0},
+  "udo z kurczaka":           {kcal:165,b:19.7,t:9.1, w:0.0, bl:0,  wap:9,  ze:0.9, mag:22, k:220, vit_c:0,  vit_a:12, vit_d:0.1,vit_b12:0.3,fol:4,  zn:1.8},
+  "wołowina chuda":           {kcal:136,b:20.0,t:5.9, w:0.0, bl:0,  wap:6,  ze:2.1, mag:21, k:318, vit_c:0,  vit_a:0,  vit_d:0.1,vit_b12:2.1,fol:8,  zn:4.8},
+  "wieprzowina schab":        {kcal:157,b:20.5,t:8.0, w:0.0, bl:0,  wap:5,  ze:0.9, mag:25, k:370, vit_c:0,  vit_a:2,  vit_d:0.5,vit_b12:0.7,fol:3,  zn:2.4},
+  "wieprzowina boczek":       {kcal:380,b:10.0,t:37.0,w:0.0, bl:0,  wap:7,  ze:0.6, mag:14, k:180, vit_c:0,  vit_a:0,  vit_d:0.3,vit_b12:0.5,fol:2,  zn:1.3},
+  "indyk pierś":              {kcal:104,b:22.0,t:1.6, w:0.0, bl:0,  wap:10, ze:0.8, mag:28, k:298, vit_c:0,  vit_a:0,  vit_d:0.1,vit_b12:0.3,fol:7,  zn:1.6},
+  "jagnięcina":               {kcal:167,b:20.8,t:9.2, w:0.0, bl:0,  wap:14, ze:1.9, mag:23, k:310, vit_c:0,  vit_a:0,  vit_d:0.1,vit_b12:2.2,fol:18, zn:3.4},
+  "wątroba wieprzowa":        {kcal:134,b:20.8,t:3.8, w:3.8, bl:0,  wap:8,  ze:18.0,mag:22, k:341, vit_c:20, vit_a:6500,vit_d:1.2,vit_b12:39.0,fol:163,zn:4.0},
+  "wątroba wołowa":           {kcal:135,b:20.4,t:3.6, w:3.9, bl:0,  wap:11, ze:6.5, mag:18, k:352, vit_c:1,  vit_a:9000,vit_d:1.2,vit_b12:83.0,fol:290,zn:4.8},
+  "kiełbasa":                 {kcal:290,b:14.0,t:24.0,w:3.0, bl:0,  wap:18, ze:1.2, mag:14, k:240, vit_c:0,  vit_a:0,  vit_d:0.3,vit_b12:0.5,fol:3,  zn:2.0},
+
+  // ===== RYBY =====
+  "łosoś":                    {kcal:179,b:20.0,t:11.0,w:0.0, bl:0,  wap:12, ze:0.4, mag:27, k:363, vit_c:0,  vit_a:12, vit_d:11.0,vit_b12:3.2,fol:25, zn:0.6},
+  "tuńczyk w wodzie":         {kcal:103,b:23.0,t:0.9, w:0.0, bl:0,  wap:8,  ze:1.3, mag:35, k:384, vit_c:0,  vit_a:20, vit_d:4.0, vit_b12:2.5,fol:4,  zn:0.9},
+  "tuńczyk w oleju":          {kcal:198,b:21.0,t:12.5,w:0.0, bl:0,  wap:7,  ze:1.2, mag:30, k:310, vit_c:0,  vit_a:20, vit_d:4.0, vit_b12:2.5,fol:3,  zn:0.8},
+  "dorsz":                    {kcal:82, b:17.8,t:0.7, w:0.0, bl:0,  wap:16, ze:0.4, mag:42, k:413, vit_c:2,  vit_a:12, vit_d:1.5, vit_b12:1.1,fol:7,  zn:0.4},
+  "śledź":                    {kcal:158,b:18.0,t:9.0, w:0.0, bl:0,  wap:57, ze:1.1, mag:32, k:327, vit_c:0,  vit_a:28, vit_d:19.0,vit_b12:13.0,fol:10, zn:1.3},
+  "makrela":                  {kcal:205,b:19.0,t:13.9,w:0.0, bl:0,  wap:12, ze:1.4, mag:97, k:314, vit_c:0,  vit_a:28, vit_d:16.0,vit_b12:8.7,fol:1,  zn:0.9},
+  "krewetki":                 {kcal:99, b:20.9,t:1.4, w:0.2, bl:0,  wap:64, ze:2.4, mag:37, k:259, vit_c:2,  vit_a:54, vit_d:0.4, vit_b12:1.3,fol:19, zn:1.3},
+  "pstrąg":                   {kcal:119,b:20.5,t:3.9, w:0.0, bl:0,  wap:67, ze:0.7, mag:28, k:396, vit_c:0,  vit_a:16, vit_d:19.2,vit_b12:5.4,fol:15, zn:0.7},
+  "sardynki w oleju":         {kcal:208,b:24.6,t:11.5,w:0.0, bl:0,  wap:382,ze:2.9, mag:39, k:397, vit_c:0,  vit_a:35, vit_d:7.6, vit_b12:8.9,fol:10, zn:1.3},
+
+  // ===== JAJA =====
+  "jajko":                    {kcal:143,b:12.5,t:9.7, w:0.6, bl:0,  wap:50, ze:1.8, mag:10, k:126, vit_c:0,  vit_a:140,vit_d:2.0, vit_b12:0.9,fol:47, zn:1.1},
+  "białko jajka":             {kcal:52, b:10.9,t:0.2, w:0.7, bl:0,  wap:7,  ze:0.1, mag:9,  k:163, vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.1,fol:4,  zn:0.0},
+  "żółtko jajka":             {kcal:322,b:15.9,t:26.5,w:3.6, bl:0,  wap:129,ze:2.7, mag:5,  k:109, vit_c:0,  vit_a:381,vit_d:5.4, vit_b12:1.95,fol:146,zn:2.3},
+
+  // ===== NABIAŁ =====
+  "mleko 2%":                 {kcal:46, b:3.2, t:1.9, w:4.8, bl:0,  wap:112,ze:0.0, mag:11, k:152, vit_c:1,  vit_a:28, vit_d:0.1, vit_b12:0.4,fol:5,  zn:0.4},
+  "mleko 3.2%":               {kcal:60, b:3.2, t:3.2, w:4.8, bl:0,  wap:114,ze:0.0, mag:11, k:150, vit_c:1,  vit_a:46, vit_d:0.1, vit_b12:0.4,fol:5,  zn:0.4},
+  "mleko odtłuszczone":       {kcal:33, b:3.3, t:0.1, w:4.8, bl:0,  wap:120,ze:0.0, mag:12, k:156, vit_c:1,  vit_a:5,  vit_d:0.0, vit_b12:0.4,fol:5,  zn:0.4},
+  "jogurt naturalny":         {kcal:59, b:3.5, t:1.9, w:4.7, bl:0,  wap:110,ze:0.1, mag:10, k:141, vit_c:1,  vit_a:17, vit_d:0.0, vit_b12:0.4,fol:7,  zn:0.5},
+  "jogurt grecki":            {kcal:97, b:9.0, t:5.0, w:3.6, bl:0,  wap:100,ze:0.1, mag:11, k:141, vit_c:0,  vit_a:27, vit_d:0.0, vit_b12:0.5,fol:5,  zn:0.5},
+  "skyr":                     {kcal:65, b:11.0,t:0.2, w:4.0, bl:0,  wap:135,ze:0.0, mag:13, k:165, vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.4,fol:3,  zn:0.5},
+  "ser twarogowy chudy":      {kcal:81, b:18.0,t:0.5, w:2.0, bl:0,  wap:84, ze:0.2, mag:13, k:137, vit_c:0,  vit_a:14, vit_d:0.0, vit_b12:0.5,fol:12, zn:0.4},
+  "ser twarogowy półtłusty":  {kcal:116,b:17.0,t:4.0, w:2.5, bl:0,  wap:95, ze:0.2, mag:12, k:130, vit_c:0,  vit_a:36, vit_d:0.1, vit_b12:0.4,fol:11, zn:0.4},
+  "ser żółty":                {kcal:356,b:25.0,t:27.0,w:2.2, bl:0,  wap:700,ze:0.2, mag:28, k:98,  vit_c:0,  vit_a:270,vit_d:0.5, vit_b12:1.5,fol:21, zn:3.5},
+  "ser żółty edamski":        {kcal:330,b:25.0,t:25.0,w:1.4, bl:0,  wap:731,ze:0.3, mag:30, k:188, vit_c:0,  vit_a:243,vit_d:0.5, vit_b12:1.5,fol:20, zn:3.8},
+  "mozzarella":               {kcal:280,b:20.0,t:22.0,w:2.2, bl:0,  wap:505,ze:0.3, mag:19, k:95,  vit_c:0,  vit_a:179,vit_d:0.3, vit_b12:0.7,fol:7,  zn:2.9},
+  "masło":                    {kcal:744,b:0.6, t:82.0,w:0.6, bl:0,  wap:15, ze:0.0, mag:2,  k:26,  vit_c:0,  vit_a:671,vit_d:1.5, vit_b12:0.1,fol:3,  zn:0.1},
+  "śmietana 18%":             {kcal:180,b:2.7, t:18.0,w:3.3, bl:0,  wap:78, ze:0.1, mag:8,  k:130, vit_c:1,  vit_a:167,vit_d:0.4, vit_b12:0.3,fol:4,  zn:0.3},
+  "kefir":                    {kcal:52, b:3.4, t:1.9, w:4.7, bl:0,  wap:120,ze:0.1, mag:12, k:150, vit_c:1,  vit_a:28, vit_d:0.1, vit_b12:0.5,fol:10, zn:0.4},
+
+  // ===== ZBOŻA =====
+  "ryż biały":                {kcal:130,b:2.7, t:0.3, w:28.1,bl:0.4,wap:10, ze:0.2, mag:13, k:35,  vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:2,  zn:0.5},
+  "ryż brązowy":              {kcal:111,b:2.6, t:0.9, w:22.8,bl:1.8,wap:10, ze:0.5, mag:43, k:79,  vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:4,  zn:0.6},
+  "makaron pszenny":          {kcal:131,b:4.5, t:0.8, w:26.0,bl:1.4,wap:7,  ze:0.5, mag:18, k:44,  vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:7,  zn:0.5},
+  "makaron pełnoziarnisty":   {kcal:124,b:5.3, t:0.9, w:23.4,bl:3.5,wap:15, ze:1.1, mag:46, k:96,  vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:8,  zn:1.1},
+  "kasza gryczana":           {kcal:92, b:3.4, t:0.6, w:19.9,bl:2.7,wap:7,  ze:0.8, mag:51, k:88,  vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:14, zn:0.7},
+  "kasza jaglana":            {kcal:119,b:3.5, t:1.0, w:23.7,bl:1.3,wap:3,  ze:0.6, mag:44, k:62,  vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:19, zn:0.9},
+  "kasza bulgur":             {kcal:83, b:3.1, t:0.2, w:18.6,bl:4.5,wap:10, ze:1.0, mag:32, k:68,  vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:8,  zn:0.6},
+  "kasza kuskus":             {kcal:112,b:3.8, t:0.2, w:23.2,bl:1.4,wap:8,  ze:0.4, mag:10, k:58,  vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:15, zn:0.3},
+  "płatki owsiane":           {kcal:372,b:12.5,t:7.1, w:61.0,bl:10.6,wap:52,ze:4.6, mag:138,k:362, vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:26, zn:3.6},
+  "quinoa":                   {kcal:120,b:4.4, t:1.9, w:21.3,bl:2.8,wap:17, ze:1.5, mag:64, k:172, vit_c:0,  vit_a:1,  vit_d:0.0, vit_b12:0.0,fol:42, zn:1.1},
+  "chleb żytni":              {kcal:224,b:6.7, t:1.3, w:45.0,bl:6.2,wap:22, ze:2.0, mag:40, k:166, vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:35, zn:1.5},
+  "chleb pszenny":            {kcal:265,b:8.0, t:1.5, w:55.0,bl:2.7,wap:20, ze:1.5, mag:22, k:115, vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:20, zn:0.7},
+  "chleb graham":             {kcal:228,b:8.4, t:1.5, w:45.0,bl:5.8,wap:28, ze:2.5, mag:50, k:210, vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:30, zn:1.8},
+  "mąka pszenna":             {kcal:364,b:10.3,t:1.0, w:76.3,bl:2.7,wap:15, ze:1.2, mag:22, k:107, vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:26, zn:0.7},
+  "mąka żytnia":              {kcal:325,b:8.9, t:1.7, w:65.4,bl:13.5,wap:32,ze:3.0, mag:73, k:255, vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:60, zn:2.5},
+
+  // ===== WARZYWA =====
+  "ziemniaki":                {kcal:77, b:2.0, t:0.1, w:17.0,bl:1.8,wap:8,  ze:0.6, mag:22, k:425, vit_c:13, vit_a:2,  vit_d:0.0, vit_b12:0.0,fol:15, zn:0.3},
+  "bataty":                   {kcal:86, b:1.6, t:0.1, w:20.1,bl:3.0,wap:27, ze:0.6, mag:23, k:430, vit_c:20, vit_a:961,vit_d:0.0, vit_b12:0.0,fol:6,  zn:0.4},
+  "marchew":                  {kcal:41, b:0.9, t:0.2, w:9.6, bl:2.8,wap:33, ze:0.3, mag:12, k:320, vit_c:6,  vit_a:852,vit_d:0.0, vit_b12:0.0,fol:19, zn:0.2},
+  "brokuł":                   {kcal:35, b:2.4, t:0.4, w:7.2, bl:3.3,wap:40, ze:0.7, mag:21, k:293, vit_c:90, vit_a:77, vit_d:0.0, vit_b12:0.0,fol:108,zn:0.4},
+  "szpinak":                  {kcal:23, b:2.9, t:0.4, w:3.6, bl:2.2,wap:99, ze:2.7, mag:79, k:558, vit_c:28, vit_a:469,vit_d:0.0, vit_b12:0.0,fol:194,zn:0.5},
+  "pomidor":                  {kcal:18, b:0.9, t:0.2, w:3.9, bl:1.2,wap:10, ze:0.3, mag:11, k:237, vit_c:14, vit_a:42, vit_d:0.0, vit_b12:0.0,fol:15, zn:0.2},
+  "ogórek":                   {kcal:15, b:0.7, t:0.1, w:3.6, bl:0.5,wap:16, ze:0.3, mag:13, k:147, vit_c:3,  vit_a:5,  vit_d:0.0, vit_b12:0.0,fol:7,  zn:0.2},
+  "papryka czerwona":         {kcal:31, b:1.0, t:0.3, w:6.0, bl:2.1,wap:7,  ze:0.4, mag:12, k:211, vit_c:128,vit_a:157,vit_d:0.0, vit_b12:0.0,fol:46, zn:0.3},
+  "papryka żółta":            {kcal:27, b:1.0, t:0.2, w:6.3, bl:0.9,wap:11, ze:0.5, mag:12, k:212, vit_c:184,vit_a:10, vit_d:0.0, vit_b12:0.0,fol:26, zn:0.2},
+  "papryka zielona":          {kcal:20, b:0.9, t:0.2, w:4.6, bl:1.7,wap:10, ze:0.3, mag:10, k:175, vit_c:80, vit_a:18, vit_d:0.0, vit_b12:0.0,fol:10, zn:0.1},
+  "cebula":                   {kcal:40, b:1.1, t:0.1, w:9.3, bl:1.7,wap:23, ze:0.2, mag:10, k:146, vit_c:7,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:19, zn:0.2},
+  "czosnek":                  {kcal:149,b:6.4, t:0.5, w:33.1,bl:2.1,wap:181,ze:1.7, mag:25, k:401, vit_c:31, vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:3,  zn:1.2},
+  "kapusta biała":            {kcal:25, b:1.3, t:0.1, w:5.8, bl:2.5,wap:40, ze:0.5, mag:12, k:170, vit_c:37, vit_a:5,  vit_d:0.0, vit_b12:0.0,fol:43, zn:0.2},
+  "kapusta czerwona":         {kcal:31, b:1.4, t:0.2, w:7.4, bl:2.1,wap:45, ze:0.8, mag:16, k:243, vit_c:57, vit_a:56, vit_d:0.0, vit_b12:0.0,fol:18, zn:0.2},
+  "kalafior":                 {kcal:23, b:1.8, t:0.3, w:4.1, bl:2.0,wap:16, ze:0.3, mag:9,  k:176, vit_c:48, vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:57, zn:0.2},
+  "sałata":                   {kcal:15, b:1.4, t:0.2, w:2.9, bl:1.3,wap:36, ze:0.9, mag:14, k:194, vit_c:18, vit_a:166,vit_d:0.0, vit_b12:0.0,fol:73, zn:0.2},
+  "rukola":                   {kcal:25, b:2.6, t:0.7, w:3.7, bl:1.6,wap:160,ze:1.5, mag:47, k:369, vit_c:15, vit_a:119,vit_d:0.0, vit_b12:0.0,fol:97, zn:0.5},
+  "kukurydza":                {kcal:96, b:3.4, t:1.5, w:21.0,bl:2.4,wap:3,  ze:0.5, mag:26, k:270, vit_c:7,  vit_a:10, vit_d:0.0, vit_b12:0.0,fol:46, zn:0.5},
+  "groszek zielony":          {kcal:84, b:5.4, t:0.4, w:15.6,bl:5.5,wap:27, ze:1.5, mag:33, k:244, vit_c:40, vit_a:38, vit_d:0.0, vit_b12:0.0,fol:65, zn:1.2},
+  "buraki":                   {kcal:44, b:1.7, t:0.2, w:9.6, bl:2.0,wap:16, ze:0.8, mag:23, k:325, vit_c:5,  vit_a:2,  vit_d:0.0, vit_b12:0.0,fol:109,zn:0.4},
+  "cukinia":                  {kcal:17, b:1.2, t:0.3, w:3.1, bl:1.0,wap:16, ze:0.4, mag:18, k:261, vit_c:18, vit_a:10, vit_d:0.0, vit_b12:0.0,fol:24, zn:0.3},
+  "bakłażan":                 {kcal:25, b:1.0, t:0.2, w:5.9, bl:3.0,wap:9,  ze:0.2, mag:14, k:229, vit_c:2,  vit_a:1,  vit_d:0.0, vit_b12:0.0,fol:22, zn:0.2},
+  "dynia":                    {kcal:26, b:1.0, t:0.1, w:6.5, bl:0.5,wap:21, ze:0.8, mag:12, k:340, vit_c:9,  vit_a:426,vit_d:0.0, vit_b12:0.0,fol:16, zn:0.3},
+  "por":                      {kcal:61, b:1.5, t:0.3, w:14.2,bl:1.8,wap:59, ze:2.1, mag:28, k:180, vit_c:12, vit_a:83, vit_d:0.0, vit_b12:0.0,fol:64, zn:0.1},
+  "seler naciowy":            {kcal:16, b:0.7, t:0.2, w:3.0, bl:1.6,wap:40, ze:0.2, mag:11, k:260, vit_c:3,  vit_a:22, vit_d:0.0, vit_b12:0.0,fol:36, zn:0.1},
+  "seler korzeniowy":         {kcal:42, b:1.5, t:0.3, w:9.2, bl:1.8,wap:43, ze:0.7, mag:20, k:300, vit_c:8,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:8,  zn:0.3},
+  "pietruszka korzeń":        {kcal:55, b:2.1, t:0.6, w:11.6,bl:4.4,wap:66, ze:1.0, mag:44, k:342, vit_c:41, vit_a:8,  vit_d:0.0, vit_b12:0.0,fol:99, zn:0.7},
+  "natka pietruszki":         {kcal:43, b:3.5, t:0.8, w:7.5, bl:3.3,wap:138,ze:5.5, mag:50, k:554, vit_c:133,vit_a:421,vit_d:0.0, vit_b12:0.0,fol:152,zn:1.1},
+
+  // ===== OWOCE =====
+  "jabłko":                   {kcal:52, b:0.3, t:0.2, w:13.8,bl:2.4,wap:6,  ze:0.1, mag:5,  k:107, vit_c:5,  vit_a:3,  vit_d:0.0, vit_b12:0.0,fol:3,  zn:0.0},
+  "banan":                    {kcal:89, b:1.1, t:0.3, w:22.8,bl:2.6,wap:5,  ze:0.3, mag:27, k:358, vit_c:9,  vit_a:3,  vit_d:0.0, vit_b12:0.0,fol:20, zn:0.2},
+  "pomarańcza":               {kcal:47, b:0.9, t:0.1, w:11.8,bl:2.4,wap:40, ze:0.1, mag:10, k:181, vit_c:53, vit_a:11, vit_d:0.0, vit_b12:0.0,fol:30, zn:0.1},
+  "truskawki":                {kcal:32, b:0.7, t:0.3, w:7.7, bl:2.0,wap:16, ze:0.4, mag:13, k:153, vit_c:59, vit_a:1,  vit_d:0.0, vit_b12:0.0,fol:24, zn:0.1},
+  "borówki":                  {kcal:57, b:0.7, t:0.3, w:14.5,bl:2.4,wap:6,  ze:0.3, mag:6,  k:77,  vit_c:10, vit_a:3,  vit_d:0.0, vit_b12:0.0,fol:6,  zn:0.2},
+  "maliny":                   {kcal:52, b:1.2, t:0.7, w:11.9,bl:6.5,wap:25, ze:0.7, mag:22, k:151, vit_c:27, vit_a:2,  vit_d:0.0, vit_b12:0.0,fol:21, zn:0.4},
+  "wiśnie":                   {kcal:63, b:1.1, t:0.2, w:16.0,bl:2.1,wap:13, ze:0.4, mag:11, k:222, vit_c:7,  vit_a:19, vit_d:0.0, vit_b12:0.0,fol:8,  zn:0.1},
+  "gruszka":                  {kcal:57, b:0.4, t:0.1, w:15.2,bl:3.1,wap:9,  ze:0.2, mag:7,  k:116, vit_c:4,  vit_a:1,  vit_d:0.0, vit_b12:0.0,fol:7,  zn:0.1},
+  "śliwki":                   {kcal:46, b:0.7, t:0.3, w:11.4,bl:1.4,wap:6,  ze:0.2, mag:7,  k:157, vit_c:10, vit_a:17, vit_d:0.0, vit_b12:0.0,fol:5,  zn:0.1},
+  "kiwi":                     {kcal:61, b:1.1, t:0.5, w:14.7,bl:3.0,wap:34, ze:0.3, mag:17, k:312, vit_c:93, vit_a:4,  vit_d:0.0, vit_b12:0.0,fol:25, zn:0.1},
+  "mango":                    {kcal:60, b:0.8, t:0.4, w:15.0,bl:1.6,wap:11, ze:0.2, mag:10, k:168, vit_c:28, vit_a:54, vit_d:0.0, vit_b12:0.0,fol:43, zn:0.1},
+  "awokado":                  {kcal:160,b:2.0, t:14.7,w:8.5, bl:6.7,wap:12, ze:0.6, mag:29, k:485, vit_c:10, vit_a:7,  vit_d:0.0, vit_b12:0.0,fol:81, zn:0.6},
+  "winogrona":                {kcal:69, b:0.6, t:0.2, w:18.0,bl:0.9,wap:10, ze:0.4, mag:7,  k:191, vit_c:4,  vit_a:3,  vit_d:0.0, vit_b12:0.0,fol:2,  zn:0.1},
+  "grejpfrut":                {kcal:42, b:0.8, t:0.1, w:10.7,bl:1.6,wap:22, ze:0.1, mag:9,  k:135, vit_c:31, vit_a:46, vit_d:0.0, vit_b12:0.0,fol:13, zn:0.1},
+  "cytryna":                  {kcal:22, b:1.1, t:0.3, w:9.3, bl:2.8,wap:26, ze:0.6, mag:8,  k:138, vit_c:53, vit_a:1,  vit_d:0.0, vit_b12:0.0,fol:11, zn:0.1},
+  "ananas":                   {kcal:50, b:0.5, t:0.1, w:13.1,bl:1.4,wap:13, ze:0.3, mag:12, k:109, vit_c:48, vit_a:3,  vit_d:0.0, vit_b12:0.0,fol:18, zn:0.1},
+  "daktyle":                  {kcal:282,b:2.5, t:0.4, w:75.0,bl:8.0,wap:39, ze:1.0, mag:43, k:656, vit_c:0,  vit_a:7,  vit_d:0.0, vit_b12:0.0,fol:15, zn:0.4},
+  "rodzynki":                 {kcal:299,b:3.1, t:0.5, w:79.2,bl:3.7,wap:50, ze:1.9, mag:32, k:746, vit_c:2,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:5,  zn:0.2},
+
+  // ===== STRĄCZKOWE =====
+  "soczewica czerwona":       {kcal:116,b:9.0, t:0.4, w:20.1,bl:7.9,wap:19, ze:3.3, mag:36, k:369, vit_c:1,  vit_a:1,  vit_d:0.0, vit_b12:0.0,fol:181,zn:1.3},
+  "soczewica zielona":        {kcal:116,b:9.0, t:0.4, w:20.1,bl:7.9,wap:19, ze:3.3, mag:36, k:369, vit_c:1,  vit_a:1,  vit_d:0.0, vit_b12:0.0,fol:181,zn:1.3},
+  "ciecierzyca":              {kcal:164,b:8.9, t:2.6, w:27.4,bl:7.6,wap:49, ze:2.9, mag:48, k:291, vit_c:1,  vit_a:1,  vit_d:0.0, vit_b12:0.0,fol:172,zn:1.5},
+  "fasola czerwona":          {kcal:127,b:8.7, t:0.5, w:22.8,bl:6.4,wap:28, ze:2.9, mag:45, k:405, vit_c:1,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:130,zn:1.4},
+  "fasola biała":             {kcal:139,b:9.7, t:0.5, w:25.1,bl:6.3,wap:90, ze:3.7, mag:63, k:561, vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:145,zn:1.0},
+  "fasola czarna":            {kcal:132,b:8.9, t:0.5, w:23.7,bl:8.7,wap:27, ze:2.1, mag:70, k:355, vit_c:0,  vit_a:1,  vit_d:0.0, vit_b12:0.0,fol:149,zn:1.0},
+  "groch":                    {kcal:118,b:8.3, t:0.4, w:21.1,bl:8.3,wap:27, ze:1.3, mag:36, k:362, vit_c:0,  vit_a:4,  vit_d:0.0, vit_b12:0.0,fol:95, zn:1.0},
+  "tofu":                     {kcal:76, b:8.1, t:4.2, w:1.9, bl:0.3,wap:350,ze:5.4, mag:30, k:121, vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:19, zn:0.8},
+  "tempeh":                   {kcal:193,b:19.0,t:10.8,w:9.4, bl:9.4,wap:111,ze:2.7, mag:81, k:401, vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:24, zn:1.7},
+  "edamame":                  {kcal:122,b:11.9,t:5.2, w:8.9, bl:5.2,wap:60, ze:2.3, mag:64, k:436, vit_c:9,  vit_a:9,  vit_d:0.0, vit_b12:0.0,fol:311,zn:1.4},
+
+  // ===== ORZECHY I NASIONA =====
+  "migdały":                  {kcal:579,b:21.2,t:49.9,w:21.6,bl:12.5,wap:264,ze:3.7,mag:270,k:733, vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:44, zn:3.1},
+  "orzechy włoskie":          {kcal:654,b:15.2,t:65.2,w:13.7,bl:6.7,wap:98, ze:2.9, mag:158,k:441, vit_c:1,  vit_a:1,  vit_d:0.0, vit_b12:0.0,fol:98, zn:3.1},
+  "orzechy nerkowca":         {kcal:553,b:18.2,t:43.9,w:30.2,bl:3.3,wap:37, ze:6.7, mag:292,k:660, vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:25, zn:5.8},
+  "orzechy laskowe":          {kcal:628,b:15.0,t:60.8,w:16.7,bl:9.7,wap:114,ze:4.7, mag:163,k:680, vit_c:6,  vit_a:1,  vit_d:0.0, vit_b12:0.0,fol:113,zn:2.5},
+  "nasiona słonecznika":      {kcal:584,b:20.8,t:51.5,w:20.0,bl:8.6,wap:78, ze:5.3, mag:325,k:645, vit_c:1,  vit_a:1,  vit_d:0.0, vit_b12:0.0,fol:227,zn:5.0},
+  "nasiona dyni":             {kcal:559,b:30.2,t:49.1,w:10.7,bl:6.0,wap:46, ze:8.8, mag:592,k:809, vit_c:2,  vit_a:16, vit_d:0.0, vit_b12:0.0,fol:57, zn:7.8},
+  "siemię lniane":            {kcal:534,b:18.3,t:42.2,w:28.9,bl:27.3,wap:255,ze:5.7,mag:392,k:813, vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:87, zn:4.3},
+  "nasiona chia":             {kcal:486,b:16.5,t:30.7,w:42.1,bl:34.4,wap:631,ze:7.7,mag:335,k:407, vit_c:1,  vit_a:5,  vit_d:0.0, vit_b12:0.0,fol:49, zn:4.6},
+  "masło orzechowe":          {kcal:588,b:25.1,t:50.4,w:20.1,bl:6.0,wap:49, ze:1.9, mag:170,k:564, vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:87, zn:2.9},
+  "sezam":                    {kcal:573,b:17.7,t:49.7,w:23.5,bl:11.8,wap:975,ze:14.6,mag:351,k:468,vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:97, zn:7.8},
+  "tahini":                   {kcal:595,b:17.0,t:53.8,w:21.2,bl:9.3,wap:426,ze:8.9, mag:95, k:414, vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:78, zn:4.6},
+
+  // ===== TŁUSZCZE =====
+  "oliwa z oliwek":           {kcal:884,b:0.0, t:100.0,w:0.0, bl:0,  wap:1,  ze:0.6, mag:0,  k:1,   vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:0,  zn:0.0},
+  "olej rzepakowy":           {kcal:884,b:0.0, t:100.0,w:0.0, bl:0,  wap:0,  ze:0.0, mag:0,  k:0,   vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:0,  zn:0.0},
+  "olej kokosowy":            {kcal:884,b:0.0, t:100.0,w:0.0, bl:0,  wap:0,  ze:0.0, mag:0,  k:0,   vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:0,  zn:0.0},
+  "olej słonecznikowy":       {kcal:884,b:0.0, t:100.0,w:0.0, bl:0,  wap:0,  ze:0.0, mag:0,  k:0,   vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:0,  zn:0.0},
+
+  // ===== INNE =====
+  "miód":                     {kcal:304,b:0.3, t:0.0, w:82.4,bl:0.2,wap:6,  ze:0.4, mag:2,  k:52,  vit_c:1,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:2,  zn:0.1},
+  "cukier biały":             {kcal:387,b:0.0, t:0.0, w:99.8,bl:0,  wap:1,  ze:0.0, mag:0,  k:3,   vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:0,  zn:0.0},
+  "kakao":                    {kcal:228,b:19.6,t:13.7,w:57.9,bl:37.0,wap:128,ze:13.9,mag:499,k:1524,vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:32, zn:6.8},
+  "czekolada gorzka 70%":     {kcal:598,b:7.8, t:42.6,w:45.9,bl:10.9,wap:73,ze:11.9,mag:228,k:715, vit_c:0,  vit_a:2,  vit_d:0.0, vit_b12:0.0,fol:17, zn:3.3},
+  "hummus":                   {kcal:166,b:7.9, t:9.6, w:14.3,bl:6.0,wap:49, ze:2.4, mag:57, k:228, vit_c:4,  vit_a:1,  vit_d:0.0, vit_b12:0.0,fol:72, zn:1.6},
+  "tomate passata":           {kcal:32, b:1.6, t:0.3, w:6.8, bl:1.5,wap:22, ze:0.9, mag:18, k:400, vit_c:17, vit_a:47, vit_d:0.0, vit_b12:0.0,fol:14, zn:0.3},
+
+  // ===== MIĘSO — DODATKOWE =====
+  "szynka gotowana":          {kcal:107,b:17.5,t:3.5, w:1.5, bl:0,  wap:8,  ze:0.9, mag:16, k:270, vit_c:0,  vit_a:0,  vit_d:0.3, vit_b12:0.5,fol:3,  zn:1.5},
+  "polędwica":                {kcal:109,b:21.0,t:2.5, w:0.5, bl:0,  wap:6,  ze:0.8, mag:22, k:290, vit_c:0,  vit_a:0,  vit_d:0.2, vit_b12:0.4,fol:2,  zn:1.8},
+  "kurczak pieczony":         {kcal:165,b:24.7,t:7.4, w:0.0, bl:0,  wap:12, ze:1.0, mag:27, k:242, vit_c:0,  vit_a:12, vit_d:0.1, vit_b12:0.3,fol:6,  zn:2.2},
+  "wołowina mielona":         {kcal:254,b:17.2,t:20.1,w:0.0, bl:0,  wap:18, ze:2.1, mag:18, k:270, vit_c:0,  vit_a:0,  vit_d:0.2, vit_b12:2.1,fol:8,  zn:4.8},
+
+  // ===== RYBY — DODATKOWE =====
+  "łosoś wędzony":            {kcal:117,b:18.3,t:4.3, w:0.0, bl:0,  wap:11, ze:0.5, mag:18, k:175, vit_c:0,  vit_a:26, vit_d:7.1, vit_b12:3.0,fol:2,  zn:0.5},
+  "filety z dorsza":          {kcal:76, b:17.4,t:0.4, w:0.0, bl:0,  wap:14, ze:0.3, mag:28, k:390, vit_c:0,  vit_a:6,  vit_d:1.0, vit_b12:0.9,fol:7,  zn:0.5},
+
+  // ===== NABIAŁ — DODATKOWE =====
+  "serek wiejski":            {kcal:72, b:12.4,t:1.0, w:3.4, bl:0,  wap:83, ze:0.2, mag:11, k:104, vit_c:0,  vit_a:10, vit_d:0.0, vit_b12:0.6,fol:12, zn:0.5},
+  "ricotta":                  {kcal:174,b:11.3,t:12.5,w:3.0, bl:0,  wap:207,ze:0.4, mag:11, k:105, vit_c:0,  vit_a:120,vit_d:0.0, vit_b12:0.3,fol:12, zn:1.2},
+  "parmezan":                 {kcal:392,b:35.8,t:25.8,w:3.2, bl:0,  wap:1184,ze:0.8,mag:44, k:92,  vit_c:0,  vit_a:98, vit_d:0.0, vit_b12:1.2,fol:7,  zn:2.7},
+  "feta":                     {kcal:264,b:14.2,t:21.3,w:4.1, bl:0,  wap:493,ze:0.6, mag:19, k:62,  vit_c:0,  vit_a:125,vit_d:0.0, vit_b12:1.7,fol:32, zn:2.9},
+  "maślanka":                 {kcal:40, b:3.3, t:0.9, w:4.8, bl:0,  wap:116,ze:0.1, mag:11, k:151, vit_c:1,  vit_a:19, vit_d:0.0, vit_b12:0.4,fol:5,  zn:0.4},
+  "mleko sojowe":             {kcal:54, b:3.3, t:1.8, w:6.3, bl:0.3,wap:25, ze:0.6, mag:18, k:118, vit_c:0,  vit_a:0,  vit_d:1.2, vit_b12:0.0,fol:6,  zn:0.3},
+  "mleko migdałowe":          {kcal:17, b:0.6, t:1.1, w:1.5, bl:0.3,wap:184,ze:0.2, mag:6,  k:67,  vit_c:0,  vit_a:0,  vit_d:0.9, vit_b12:0.0,fol:0,  zn:0.1},
+  "mleko owsiane":            {kcal:46, b:1.0, t:1.5, w:7.5, bl:0.5,wap:120,ze:0.2, mag:10, k:60,  vit_c:0,  vit_a:0,  vit_d:0.9, vit_b12:0.0,fol:2,  zn:0.1},
+
+  // ===== ZBOŻA — DODATKOWE =====
+  "ryż jaśminowy":            {kcal:129,b:2.7, t:0.3, w:28.0,bl:0.4,wap:10, ze:0.2, mag:10, k:35,  vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:2,  zn:0.5},
+  "makaron ryżowy":           {kcal:109,b:2.1, t:0.2, w:24.8,bl:0.9,wap:5,  ze:0.2, mag:10, k:30,  vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:2,  zn:0.3},
+  "kasza manna":              {kcal:360,b:11.0,t:1.1, w:74.5,bl:3.5,wap:24, ze:4.1, mag:47, k:186, vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:60, zn:1.1},
+  "płatki ryżowe":            {kcal:371,b:6.5, t:1.0, w:84.5,bl:1.0,wap:5,  ze:3.5, mag:20, k:130, vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:8,  zn:0.6},
+  "płatki żytnie":            {kcal:334,b:9.5, t:1.7, w:67.5,bl:11.0,wap:35,ze:3.5, mag:90, k:300, vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:55, zn:2.5},
+  "granola":                  {kcal:471,b:10.4,t:20.0,w:64.0,bl:6.5,wap:50, ze:3.6, mag:80, k:290, vit_c:1,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:25, zn:2.1},
+  "tortilla pszenna":         {kcal:306,b:8.0, t:7.3, w:53.0,bl:2.7,wap:60, ze:2.2, mag:22, k:155, vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:25, zn:0.8},
+  "tortilla kukurydziana":    {kcal:218,b:5.7, t:3.0, w:44.6,bl:4.0,wap:121,ze:1.2, mag:50, k:180, vit_c:0,  vit_a:6,  vit_d:0.0, vit_b12:0.0,fol:10, zn:0.7},
+  "wafle ryżowe":             {kcal:387,b:7.5, t:2.8, w:81.5,bl:3.5,wap:5,  ze:1.1, mag:49, k:100, vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:4,  zn:1.5},
+  "bułka pszenna":            {kcal:265,b:8.5, t:1.6, w:54.0,bl:2.3,wap:22, ze:1.7, mag:23, k:120, vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:22, zn:0.7},
+  "otręby pszenne":           {kcal:216,b:16.0,t:4.3, w:42.8,bl:42.8,wap:73,ze:10.6,mag:611,k:1182,vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:79, zn:7.3},
+  "otręby owsiane":           {kcal:246,b:17.3,t:7.0, w:66.2,bl:15.4,wap:58,ze:5.4, mag:235,k:566, vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:52, zn:3.1},
+  "kiełki pszenicy":          {kcal:360,b:23.2,t:9.7, w:51.8,bl:13.2,wap:39,ze:6.3, mag:239,k:892, vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:281,zn:12.3},
+
+  // ===== WARZYWA — DODATKOWE =====
+  "szparagi":                 {kcal:20, b:2.2, t:0.1, w:3.9, bl:2.1,wap:24, ze:2.1, mag:14, k:202, vit_c:5,  vit_a:38, vit_d:0.0, vit_b12:0.0,fol:52, zn:0.5},
+  "jarmuż":                   {kcal:49, b:4.3, t:0.9, w:8.8, bl:3.6,wap:150,ze:1.5, mag:47, k:491, vit_c:120,vit_a:500,vit_d:0.0, vit_b12:0.0,fol:141,zn:0.6},
+  "boćwina":                  {kcal:19, b:1.8, t:0.2, w:3.7, bl:1.6,wap:51, ze:1.8, mag:81, k:379, vit_c:30, vit_a:306,vit_d:0.0, vit_b12:0.0,fol:14, zn:0.4},
+  "rzodkiewka":               {kcal:16, b:0.7, t:0.1, w:3.4, bl:1.6,wap:25, ze:0.3, mag:10, k:233, vit_c:15, vit_a:4,  vit_d:0.0, vit_b12:0.0,fol:25, zn:0.3},
+  "grzyby pieczarki":         {kcal:22, b:3.1, t:0.3, w:3.3, bl:1.0,wap:3,  ze:0.5, mag:9,  k:318, vit_c:2,  vit_a:0,  vit_d:0.2, vit_b12:0.0,fol:17, zn:0.5},
+  "grzyby boczniaki":         {kcal:33, b:3.3, t:0.4, w:6.1, bl:2.3,wap:3,  ze:1.3, mag:18, k:420, vit_c:0,  vit_a:0,  vit_d:0.7, vit_b12:0.0,fol:38, zn:0.8},
+  "fasola szparagowa":        {kcal:31, b:1.8, t:0.1, w:7.0, bl:3.4,wap:37, ze:1.0, mag:25, k:209, vit_c:12, vit_a:35, vit_d:0.0, vit_b12:0.0,fol:37, zn:0.2},
+  "brukselka":                {kcal:43, b:3.4, t:0.3, w:8.9, bl:3.8,wap:42, ze:1.4, mag:23, k:389, vit_c:85, vit_a:38, vit_d:0.0, vit_b12:0.0,fol:61, zn:0.4},
+  "sałata lodowa":            {kcal:14, b:0.9, t:0.1, w:3.0, bl:1.2,wap:18, ze:0.4, mag:7,  k:141, vit_c:4,  vit_a:25, vit_d:0.0, vit_b12:0.0,fol:29, zn:0.2},
+
+  // ===== OWOCE — DODATKOWE =====
+  "granat":                   {kcal:83, b:1.7, t:1.2, w:18.7,bl:4.0,wap:10, ze:0.3, mag:12, k:236, vit_c:10, vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:38, zn:0.4},
+  "papaja":                   {kcal:43, b:0.5, t:0.3, w:10.8,bl:1.7,wap:20, ze:0.3, mag:21, k:182, vit_c:61, vit_a:47, vit_d:0.0, vit_b12:0.0,fol:37, zn:0.1},
+  "melon":                    {kcal:34, b:0.8, t:0.2, w:8.2, bl:0.9,wap:9,  ze:0.2, mag:12, k:228, vit_c:18, vit_a:169,vit_d:0.0, vit_b12:0.0,fol:21, zn:0.2},
+  "arbuz":                    {kcal:30, b:0.6, t:0.2, w:7.6, bl:0.4,wap:7,  ze:0.2, mag:10, k:112, vit_c:8,  vit_a:28, vit_d:0.0, vit_b12:0.0,fol:3,  zn:0.1},
+  "brzoskwinia":              {kcal:39, b:0.9, t:0.3, w:9.5, bl:1.5,wap:6,  ze:0.3, mag:9,  k:190, vit_c:7,  vit_a:16, vit_d:0.0, vit_b12:0.0,fol:4,  zn:0.2},
+  "morela":                   {kcal:48, b:1.4, t:0.4, w:11.1,bl:2.0,wap:13, ze:0.4, mag:10, k:259, vit_c:10, vit_a:96, vit_d:0.0, vit_b12:0.0,fol:9,  zn:0.2},
+  "suszone morele":           {kcal:241,b:3.4, t:0.5, w:62.6,bl:7.3,wap:55, ze:2.7, mag:32, k:1160,vit_c:1,  vit_a:180,vit_d:0.0, vit_b12:0.0,fol:10, zn:0.4},
+  "suszone śliwki":           {kcal:240,b:2.2, t:0.4, w:63.9,bl:7.1,wap:43, ze:0.9, mag:41, k:732, vit_c:1,  vit_a:39, vit_d:0.0, vit_b12:0.0,fol:4,  zn:0.4},
+  "żurawina suszona":         {kcal:308,b:0.1, t:1.1, w:82.5,bl:5.7,wap:8,  ze:0.3, mag:5,  k:49,  vit_c:0,  vit_a:6,  vit_d:0.0, vit_b12:0.0,fol:1,  zn:0.1},
+
+  // ===== STRĄCZKOWE — DODATKOWE =====
+  "soja gotowana":            {kcal:173,b:16.6,t:9.0, w:9.9, bl:6.0,wap:102,ze:5.1, mag:86, k:515, vit_c:1,  vit_a:1,  vit_d:0.0, vit_b12:0.0,fol:54, zn:1.0},
+  "bób gotowany":             {kcal:88, b:7.9, t:0.3, w:15.6,bl:5.4,wap:36, ze:1.5, mag:31, k:182, vit_c:9,  vit_a:53, vit_d:0.0, vit_b12:0.0,fol:148,zn:0.6},
+  "fasola mung":              {kcal:105,b:7.0, t:0.4, w:19.2,bl:7.6,wap:27, ze:1.4, mag:48, k:266, vit_c:1,  vit_a:2,  vit_d:0.0, vit_b12:0.0,fol:159,zn:0.8},
+
+  // ===== PRODUKTY SPECJALNE =====
+  "seitan":                   {kcal:370,b:75.0,t:1.9, w:14.0,bl:0.6,wap:142,ze:5.2, mag:25, k:95,  vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:0,  zn:0.8},
+  "miso":                     {kcal:199,b:12.0,t:6.0, w:26.5,bl:5.4,wap:57, ze:2.5, mag:48, k:210, vit_c:0,  vit_a:8,  vit_d:0.0, vit_b12:0.0,fol:19, zn:2.6},
+
+  // ===== OLEJE — DODATKOWE =====
+  "olej lniany":              {kcal:884,b:0.0, t:100.0,w:0.0, bl:0,  wap:0,  ze:0.0, mag:0,  k:0,   vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:0,  zn:0.0},
+  "margaryna":                {kcal:718,b:0.2, t:80.0, w:0.4, bl:0,  wap:2,  ze:0.0, mag:2,  k:10,  vit_c:0,  vit_a:740,vit_d:8.0, vit_b12:0.0,fol:1,  zn:0.1},
+
+  // ===== NAPOJE =====
+  "sok pomarańczowy":         {kcal:45, b:0.7, t:0.2, w:10.4,bl:0.2,wap:11, ze:0.2, mag:11, k:200, vit_c:50, vit_a:4,  vit_d:0.0, vit_b12:0.0,fol:30, zn:0.1},
+  "sok jabłkowy":             {kcal:46, b:0.1, t:0.1, w:11.3,bl:0.2,wap:8,  ze:0.2, mag:5,  k:101, vit_c:1,  vit_a:1,  vit_d:0.0, vit_b12:0.0,fol:1,  zn:0.0},
+
+  // ===== PRZYPRAWY I ZIOŁA =====
+  "kurkuma":                  {kcal:354,b:7.8, t:9.9, w:64.9,bl:21.1,wap:183,ze:41.4,mag:193,k:2080,vit_c:26, vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:20, zn:4.4},
+  "imbir":                    {kcal:80, b:1.8, t:0.8, w:17.8,bl:2.0,wap:16, ze:0.6, mag:43, k:415, vit_c:5,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:11, zn:0.3},
+  "natka pietruszki":         {kcal:36, b:3.0, t:0.8, w:6.3, bl:3.3,wap:138,ze:6.2, mag:50, k:554, vit_c:133,vit_a:421,vit_d:0.0, vit_b12:0.0,fol:152,zn:1.1},
+  "bazylia świeża":           {kcal:23, b:3.2, t:0.6, w:2.7, bl:1.6,wap:177,ze:3.2, mag:64, k:295, vit_c:18, vit_a:264,vit_d:0.0, vit_b12:0.0,fol:68, zn:0.8},
+  "siemię lniane mielone":    {kcal:534,b:18.3,t:42.2,w:28.9,bl:27.3,wap:255,ze:5.7,mag:392,k:813, vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:87, zn:4.3},
+};
+
+// Szukaj produktu w bazie lokalnej (dopasowanie częściowe)
+function szukajWBazie(nazwa) {
+  // Usuń gramatury i jednostki z nazwy przed szukaniem
+  const n = nazwa.toLowerCase()
+    .replace(/\d+\s*(g|ml|szt|l|kg|dag)\b/gi, '')
+    .replace(/\s+/g, ' ').trim();
+
+  if (FOOD_DB[n]) return FOOD_DB[n];
+
+  // Posortuj klucze od najdłuższych (bardziej precyzyjne) do najkrótszych
+  const posortowane = Object.keys(FOOD_DB).sort((a, b) => b.length - a.length);
+
+  // Szukaj klucza który zawiera się w oczyszczonej nazwie
+  const wNazwie = posortowane.find(k => n.includes(k));
+  if (wNazwie) return FOOD_DB[wNazwie];
+
+  // Szukaj po pierwszych 2 słowach
+  const dwaSlowa = n.split(' ').slice(0, 2).join(' ');
+  const wKluczu = posortowane.find(k => k.includes(dwaSlowa) || dwaSlowa.includes(k));
+  if (wKluczu) return FOOD_DB[wKluczu];
+
+  // Fallback: pierwsze słowo
+  const pierwszeSlowo = n.split(' ')[0];
+  const poSlowie = posortowane.find(k => k.startsWith(pierwszeSlowo));
+  return poSlowie ? FOOD_DB[poSlowie] : null;
+}
+
+// Parsuj gramaturę ze składnika np. "płatki owsiane 60g" lub "mleko 200ml" → liczba
+function parsujGramy(skladnik) {
+  // gramy
+  const mg = skladnik.match(/(\d+(?:[.,]\d+)?)\s*g\b/i);
+  if (mg) return parseFloat(mg[1].replace(',', '.'));
+  // mililitry → traktujemy jako gramy (gęstość ~1 dla większości płynów)
+  const ml = skladnik.match(/(\d+(?:[.,]\d+)?)\s*ml\b/i);
+  if (ml) return parseFloat(ml[1].replace(',', '.'));
+  // dag → gramy
+  const dag = skladnik.match(/(\d+(?:[.,]\d+)?)\s*dag\b/i);
+  if (dag) return parseFloat(dag[1].replace(',', '.')) * 10;
+  return null;
+}
+
+// Przelicz makra składnika na podstawie bazy
+function obliczMakraSkladnika(skladnik) {
+  const gramy = parsujGramy(skladnik);
+  if (!gramy) return null;
+  const dane = szukajWBazie(skladnik);
+  if (!dane) return null;
+  const mnoznik = gramy / 100;
+  return {
+    kcal: Math.round(dane.kcal * mnoznik),
+    bialko_g: Math.round(dane.b * mnoznik * 10) / 10,
+    tluszcze_g: Math.round(dane.t * mnoznik * 10) / 10,
+    weglowodany_g: Math.round(dane.w * mnoznik * 10) / 10,
+    blonnik_g: Math.round(dane.bl * mnoznik * 10) / 10,
+  };
+}
+
+// Pobierz dane z USDA jeśli brak w bazie lokalnej
+let usdaApiKey = localStorage.getItem('usda_key') || 'DEMO_KEY';
+
+async function pobierzZUSDA(nazwaProduktu) {
+  try {
+    const q = encodeURIComponent(nazwaProduktu);
+    const res = await fetch(
+      `https://api.nal.usda.gov/fdc/v1/foods/search?query=${q}&dataType=Foundation,SR%20Legacy&pageSize=1&api_key=${usdaApiKey}`
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    const food = data.foods?.[0];
+    if (!food) return null;
+    const getNutrient = (id) => food.foodNutrients?.find(n => n.nutrientId === id)?.value || 0;
+    return {
+      kcal: Math.round(getNutrient(1008)),
+      b: getNutrient(1003),
+      t: getNutrient(1004),
+      w: getNutrient(1005),
+      bl: getNutrient(1079),
+    };
+  } catch { return null; }
+}
+
+// Przelicz makra posiłku z bazy (lokalna → USDA fallback)
+async function przeliczMakraPosilku(skladniki) {
+  let kcal=0, bialko=0, tluszcze=0, weglowodany=0, blonnik=0;
+  let wap=0, ze=0, mag=0, k=0, vit_c=0, vit_a=0, vit_d=0, vit_b12=0, fol=0, zn=0;
+  let znaleziono = 0;
+  for (const s of (skladniki || [])) {
+    const gramy = parsujGramy(s);
+    if (!gramy) continue;
+    let dane = szukajWBazie(s);
+    if (!dane) {
+      const nazwaBezGramow = s.replace(/\d+\s*(g|ml|dag)\b/gi,'').trim();
+      dane = await pobierzZUSDA(nazwaBezGramow);
+    }
+    if (dane) {
+      const m = gramy / 100;
+      kcal        += (dane.kcal||0) * m;
+      bialko      += (dane.b||0) * m;
+      tluszcze    += (dane.t||0) * m;
+      weglowodany += (dane.w||0) * m;
+      blonnik     += (dane.bl||0) * m;
+      wap         += (dane.wap||0) * m;
+      ze          += (dane.ze||0) * m;
+      mag         += (dane.mag||0) * m;
+      k           += (dane.k||0) * m;
+      vit_c       += (dane.vit_c||0) * m;
+      vit_a       += (dane.vit_a||0) * m;
+      vit_d       += (dane.vit_d||0) * m;
+      vit_b12     += (dane.vit_b12||0) * m;
+      fol         += (dane.fol||0) * m;
+      zn          += (dane.zn||0) * m;
+      znaleziono++;
+    }
+  }
+  if (znaleziono === 0) return null;
+  const r = (v, d=1) => Math.round(v * Math.pow(10,d)) / Math.pow(10,d);
+  return {
+    kcal: Math.round(kcal),
+    bialko_g:      r(bialko),
+    tluszcze_g:    r(tluszcze),
+    weglowodany_g: r(weglowodany),
+    blonnik_g:     r(blonnik),
+    wapn_mg:       r(wap, 0),
+    zelazo_mg:     r(ze),
+    magnez_mg:     r(mag, 0),
+    potas_mg:      r(k, 0),
+    vit_c_mg:      r(vit_c),
+    vit_a_ug:      r(vit_a, 0),
+    vit_d_ug:      r(vit_d),
+    vit_b12_ug:    r(vit_b12),
+    folany_ug:     r(fol, 0),
+    cynk_mg:       r(zn),
+  };
+}
+
+// Wzbogać cały jadłospis o makra z bazy (nadpisuje wartości Gemini)
+async function wzbogacMakrami(json) {
+  const mikro_pola = ['wapn_mg','zelazo_mg','magnez_mg','potas_mg','vit_c_mg','vit_a_ug','vit_d_ug','vit_b12_ug','folany_ug','cynk_mg'];
+
+  for (const dzien of (json.dni || [])) {
+    for (const posilek of (dzien.posilki || [])) {
+      const makra = await przeliczMakraPosilku(posilek.skladniki);
+      if (makra) {
+        Object.assign(posilek, makra);
+        posilek.zrodlo_makr = 'baza';
+      } else {
+        posilek.zrodlo_makr = 'ai';
+      }
+    }
+  }
+
+  // Średnia dzienna
+  const liczbaDni = json.dni?.length || 1;
+  const suma = json.dni?.reduce((acc, d) => {
+    for (const p of (d.posilki||[])) {
+      acc.kcal += p.kcal||0;
+      acc.b    += p.bialko_g||0;
+      acc.t    += p.tluszcze_g||0;
+      acc.w    += p.weglowodany_g||0;
+      acc.bl   += p.blonnik_g||0;
+      for (const pole of mikro_pola) acc[pole] = (acc[pole]||0) + (p[pole]||0);
+    }
+    return acc;
+  }, { kcal:0, b:0, t:0, w:0, bl:0 });
+
+  json.kcal_dziennie    = Math.round(suma.kcal / liczbaDni);
+  json.bialko_g         = Math.round(suma.b / liczbaDni * 10) / 10;
+  json.tluszcze_g       = Math.round(suma.t / liczbaDni * 10) / 10;
+  json.weglowodany_g    = Math.round(suma.w / liczbaDni * 10) / 10;
+  json.blonnik_g        = Math.round(suma.bl / liczbaDni * 10) / 10;
+  json.mikro = {};
+  for (const pole of mikro_pola) {
+    json.mikro[pole] = Math.round((suma[pole]||0) / liczbaDni * 10) / 10;
+  }
+  return json;
+}
+
+// Normy dzienne IŻŻ
+function getNormy(gender, age) {
+  const k = (gender === 'kobieta');
+  return {
+    kcal:    k ? 2000 : 2500,
+    bialko:  k ? 55   : 65,
+    blonnik: 25,
+    wapn:    1000,
+    zelazo:  k ? 18   : 10,
+    magnez:  k ? 320  : 420,
+    vit_c:   75,
+    vit_d:   15,
+    vit_b12: 2.4,
+    fol:     400,
+    cynk:    k ? 8    : 11,
+  };
+}
+
+// Panel mikroskładników z wykresami słupkowymi i normami IŻŻ
+function renderMikroPanel(json, params) {
+  const n = getNormy(params.gender, params.age);
+  const m = json.mikro || {};
+  const r = v => Math.round(v * 10) / 10;
+
+  const dane = [
+    { label:'Wapń',     war: r(m.wapn_mg||0),    norma: n.wapn,    jedn:'mg' },
+    { label:'Żelazo',   war: r(m.zelazo_mg||0),  norma: n.zelazo,  jedn:'mg' },
+    { label:'Magnez',   war: r(m.magnez_mg||0),  norma: n.magnez,  jedn:'mg' },
+    { label:'Wit. C',   war: r(m.vit_c_mg||0),   norma: n.vit_c,   jedn:'mg' },
+    { label:'Wit. D',   war: r(m.vit_d_ug||0),   norma: n.vit_d,   jedn:'µg' },
+    { label:'Wit. B12', war: r(m.vit_b12_ug||0), norma: n.vit_b12, jedn:'µg' },
+    { label:'Kw. fol.', war: r(m.folany_ug||0),  norma: n.fol,     jedn:'µg' },
+    { label:'Błonnik',  war: r(json.blonnik_g||0), norma: n.blonnik, jedn:'g' },
+    { label:'Cynk',     war: r(m.cynk_mg||0),    norma: n.cynk,    jedn:'mg' },
+  ];
+
+  const panel = document.createElement('div');
+  panel.className = 'mikro-panel';
+
+  let warnCount = 0, badCount = 0;
+  let rowsHtml = '', badgesHtml = '';
+
+  dane.forEach(d => {
+    if (!d.war && d.war !== 0) return;
+    const pct = d.norma > 0 ? Math.min((d.war / d.norma) * 100, 130) : 0;
+    let cls;
+    if (pct >= 100)     { cls = 'ok'; }
+    else if (pct >= 70) { cls = 'high'; warnCount++; }
+    else if (pct >= 40) { cls = 'low';  warnCount++; }
+    else                { cls = 'warn'; badCount++; }
+
+    const barW = Math.min(pct, 100).toFixed(1);
+    rowsHtml += `
+      <div class="mikro-row">
+        <div class="mikro-name">${d.label}</div>
+        <div class="mikro-bar-wrap">
+          <div class="mikro-bar ${cls}" style="width:${barW}%"></div>
+          <div class="norma-mark"></div>
+        </div>
+        <div class="mikro-val ${cls}">${d.war}${d.jedn}</div>
+      </div>`;
+
+    if (cls !== 'ok') {
+      const badgeCls = cls === 'warn' ? 'bad' : 'warn';
+      badgesHtml += `<span class="mikro-badge ${badgeCls}">${d.label}: ${Math.round(pct)}% normy</span>`;
+    }
+  });
+
+  const tytul = (badCount === 0 && warnCount === 0)
+    ? '✅ Spełnia normy IŻŻ'
+    : badCount > 0
+      ? `⚠️ Wymaga uzupełnienia (${badCount} skł.)`
+      : '📊 Prawie norma IŻŻ';
+
+  panel.innerHTML = `
+    <div class="mikro-title">🔬 Analiza mikroskładników — ${tytul}</div>
+    <div style="font-size:10px;color:var(--text2);margin-bottom:12px;opacity:0.6">Wartości średnie / dzień · Linia = 100% normy IŻŻ</div>
+    ${rowsHtml}
+    ${badgesHtml ? `<div class="mikro-status-row">${badgesHtml}</div>` : '<div class="mikro-status-row"><span class="mikro-badge ok">✅ Wszystkie normy spełnione</span></div>'}`;
+
+  return panel;
 }
 </script>
 </body>

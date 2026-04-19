@@ -492,6 +492,25 @@
   .print-header h1 { font-size: 22px; color: #4a3fbf; margin-bottom: 4px; }
   .print-header p { font-size: 12px; color: #666; }
 
+  /* KO-FI */
+  .kofi-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    margin-top: 24px;
+    padding: 14px;
+    background: linear-gradient(135deg, #ff5f5f, #ff8c42);
+    border-radius: var(--radius);
+    font-size: 15px;
+    font-weight: 600;
+    color: #fff;
+    text-decoration: none;
+    transition: opacity 0.2s, transform 0.2s;
+  }
+  .kofi-btn:active { opacity: 0.85; transform: scale(0.98); }
+
   /* SAVED */
   .saved-item {
     background: var(--card);
@@ -828,7 +847,7 @@ function renderResult(json) {
   actions.innerHTML = `
     <button class="action-btn primary" onclick="saveCurrentResult()">💾 Zapisz</button>
     <button class="action-btn" onclick="shareResult()">📤 Udostępnij</button>
-    <button class="action-btn" onclick="printResult()" style="flex:0;padding:13px 14px;">🖨️</button>`;
+    <button class="action-btn" onclick="exportToFile()" style="flex:0;padding:13px 14px;">📄</button>`;
   area.appendChild(actions);
 
   // Days
@@ -902,6 +921,14 @@ function renderResult(json) {
     });
   }
 
+  // Ko-fi
+  const kofi = document.createElement('a');
+  kofi.href = 'https://ko-fi.com/b4stek';
+  kofi.target = '_blank';
+  kofi.className = 'kofi-btn';
+  kofi.innerHTML = '☕ Postaw mi kawę na Ko-fi';
+  area.appendChild(kofi);
+
   area.classList.add('visible');
   area.style.paddingBottom = '30px';
 }
@@ -942,11 +969,103 @@ function loadSavedPlan(id) {
   switchTab('result');
 }
 
-function printResult() {
+function exportToFile() {
   if (!currentResult) return;
-  // Otwórz wszystkie dni przed drukiem
-  document.querySelectorAll('.day-card').forEach(c => c.classList.add('open'));
-  window.print();
+  const j = currentResult.json;
+  const params = currentResult.params;
+  const date = currentResult.date;
+
+  const dniHtml = j.dni.map(day => {
+    const totalKcal = day.posilki.reduce((s,m) => s+(m.kcal||0), 0);
+    const posilkiHtml = day.posilki.map(m => {
+      const skladnikiHtml = (m.skladniki||[]).map(s => `<span class="ing">${s}</span>`).join('');
+      return `
+        <div class="meal">
+          <div class="meal-time">${m.pora}</div>
+          <div class="meal-name">${m.nazwa}</div>
+          ${skladnikiHtml ? `<div class="ingredients">${skladnikiHtml}</div>` : ''}
+          <div class="macros">
+            <span>${m.kcal} kcal</span>
+            <span class="p">B: ${m.bialko_g}g</span>
+            <span class="f">T: ${m.tluszcze_g}g</span>
+            <span>W: ${m.weglowodany_g}g</span>
+          </div>
+        </div>`;
+    }).join('');
+    return `
+      <div class="day">
+        <div class="day-header">
+          <span class="day-name">${day.dzien}</span>
+          <span class="day-kcal">${totalKcal} kcal</span>
+        </div>
+        <div class="day-body">${posilkiHtml}</div>
+      </div>`;
+  }).join('');
+
+  const wskazowkiHtml = (j.wskazowki||[]).map(w => `<div class="tip">💡 ${w}</div>`).join('');
+
+  const html = `<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NutriAI — Jadłospis ${date}</title>
+<style>
+  body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; color: #222; background: #fff; }
+  .header { text-align: center; border-bottom: 3px solid #7c6af7; padding-bottom: 16px; margin-bottom: 24px; }
+  .header h1 { color: #7c6af7; margin: 0 0 6px; font-size: 26px; }
+  .header p { color: #666; font-size: 13px; margin: 0; }
+  .summary { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; background: #f5f3ff; border-radius: 10px; padding: 16px; margin-bottom: 24px; }
+  .stat { text-align: center; }
+  .stat-val { font-size: 22px; font-weight: 700; color: #7c6af7; }
+  .stat-lbl { font-size: 11px; color: #888; margin-top: 2px; }
+  .day { border: 1px solid #e0e0e0; border-radius: 10px; margin-bottom: 16px; overflow: hidden; page-break-inside: avoid; }
+  .day-header { background: #f0eeff; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; }
+  .day-name { font-weight: 700; color: #7c6af7; font-size: 15px; }
+  .day-kcal { font-size: 12px; color: #888; }
+  .day-body { padding: 12px 16px; }
+  .meal { border-bottom: 1px solid #f0f0f0; padding: 10px 0; }
+  .meal:last-child { border-bottom: none; }
+  .meal-time { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #7c6af7; }
+  .meal-name { font-size: 14px; font-weight: 600; margin: 3px 0; }
+  .ingredients { display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 0; }
+  .ing { font-size: 11px; padding: 2px 8px; border: 1px solid #e0e0e0; border-radius: 20px; color: #555; background: #fafafa; }
+  .macros { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 5px; }
+  .macros span { font-size: 11px; padding: 2px 8px; border-radius: 20px; background: #f0eeff; color: #7c6af7; }
+  .macros span.p { background: #e8faf3; color: #1a7a52; }
+  .macros span.f { background: #fff3eb; color: #b45309; }
+  .tips { margin-top: 24px; }
+  .tips h3 { color: #7c6af7; margin-bottom: 10px; }
+  .tip { background: #fafafa; border: 1px solid #e0e0e0; border-radius: 8px; padding: 10px 14px; margin-bottom: 8px; font-size: 13px; color: #555; }
+  .footer { text-align: center; margin-top: 32px; padding-top: 16px; border-top: 1px solid #eee; font-size: 11px; color: #aaa; }
+  @media print { body { padding: 10px; } .day { page-break-inside: avoid; } }
+</style>
+</head>
+<body>
+  <div class="header">
+    <h1>🥗 NutriAI — Plan Żywieniowy</h1>
+    <p>Wygenerowano: ${date} &nbsp;|&nbsp; Cel: ${params.goal} &nbsp;|&nbsp; Dieta: ${params.diet} &nbsp;|&nbsp; ${params.days} dni</p>
+  </div>
+  <div class="summary">
+    <div class="stat"><div class="stat-val">${j.kcal_dziennie}</div><div class="stat-lbl">kcal / dzień</div></div>
+    <div class="stat"><div class="stat-val">${j.bialko_g}g</div><div class="stat-lbl">Białko</div></div>
+    <div class="stat"><div class="stat-val">${j.tluszcze_g}g</div><div class="stat-lbl">Tłuszcze</div></div>
+    <div class="stat"><div class="stat-val">${j.weglowodany_g}g</div><div class="stat-lbl">Węglowodany</div></div>
+  </div>
+  ${dniHtml}
+  ${wskazowkiHtml ? `<div class="tips"><h3>Wskazówki żywieniowe</h3>${wskazowkiHtml}</div>` : ''}
+  <div class="footer">Wygenerowano przez NutriAI &nbsp;·&nbsp; ko-fi.com/b4stek</div>
+</body>
+</html>`;
+
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `jadlospisow-${date.replace(/\./g,'-')}.html`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('📄 Plik pobrany!');
 }
 
 function shareResult() {

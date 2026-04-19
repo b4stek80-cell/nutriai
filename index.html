@@ -241,6 +241,20 @@
   }
   .meal-name { font-size: 14px; font-weight: 500; margin-bottom: 4px; }
   .meal-desc { font-size: 12px; color: var(--text2); line-height: 1.5; }
+  .meal-ingredients {
+    margin: 6px 0 4px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+  .ingredient {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 20px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: var(--text2);
+  }
   .meal-macros {
     display: flex;
     gap: 10px;
@@ -698,7 +712,7 @@ async function generate() {
   try {
     document.getElementById('loaderText').textContent = 'Generuję jadłospis...';
 
-    const prompt = `Jadłospis na ${days} dni. Osoba: ${gender}, ${age} lat, ${height} cm, ${weight} kg, aktywność: ${activity}, cel: ${goal}, dieta: ${diet}, ${meals} posiłków/dzień${allergies ? ', bez: '+allergies : ''}. Zwróć JSON: {"kcal_dziennie":number,"bialko_g":number,"tluszcze_g":number,"weglowodany_g":number,"dni":[{"dzien":"string","posilki":[{"pora":"string","nazwa":"string","kcal":number,"bialko_g":number,"tluszcze_g":number,"weglowodany_g":number}]}],"wskazowki":["string"]}. Bez pola opis. Nazwy posiłków max 5 słów. 3 wskazówki.`;
+    const prompt = `Jadłospis na ${days} dni. Osoba: ${gender}, ${age} lat, ${height} cm, ${weight} kg, aktywność: ${activity}, cel: ${goal}, dieta: ${diet}, ${meals} posiłków/dzień${allergies ? ', bez: '+allergies : ''}. Zwróć JSON: {"kcal_dziennie":number,"bialko_g":number,"tluszcze_g":number,"weglowodany_g":number,"dni":[{"dzien":"string","posilki":[{"pora":"string","nazwa":"string","skladniki":["np. płatki owsiane 60g","mleko 2% 200ml"],"kcal":number,"bialko_g":number,"tluszcze_g":number,"weglowodany_g":number}]}],"wskazowki":["string"]}. Nazwy posiłków max 5 słów. Składniki z dokładnymi gramaturami i szczegółami (np. mleko 2% vs odtłuszczone, makaron pełnoziarnisty vs zwykły). 3 wskazówki.`;
 
     const json = await callGemini(prompt);
     clearInterval(msgInterval);
@@ -763,6 +777,11 @@ function renderResult(json) {
 
       let html = `<div class="meal-time">${m.pora}</div>`;
       html += `<div class="meal-name">${m.nazwa}</div>`;
+      if (m.skladniki && m.skladniki.length) {
+        html += `<div class="meal-ingredients">`;
+        m.skladniki.forEach(s => { html += `<span class="ingredient">🥄 ${s}</span>`; });
+        html += `</div>`;
+      }
       if (m.opis) html += `<div class="meal-desc">${m.opis}</div>`;
       html += `<div class="meal-macros">
         <span class="macro">${m.kcal} kcal</span>

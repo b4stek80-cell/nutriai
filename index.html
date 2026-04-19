@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#1a1a2e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>NutriAI — Generator Jadłospisów</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f0f1a;
+    --bg2: #16162a;
+    --bg3: #1e1e35;
+    --card: #1a1a30;
+    --accent: #7c6af7;
+    --accent2: #a78bfa;
+    --green: #34d399;
+    --orange: #fb923c;
+    --red: #f87171;
+    --text: #e8e8f0;
+    --text2: #9898b8;
+    --border: rgba(124,106,247,0.2);
+    --radius: 16px;
+    --radius-sm: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    max-width: 430px;
+    margin: 0 auto;
+    height: 100dvh;
+  }
+
+  /* HEADER */
+  .header {
+    padding: 16px 20px 12px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .header-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 22px;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--accent2), var(--green));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .header-sub { font-size: 11px; color: var(--text2); margin-top: 2px; }
+  .key-btn {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 12px;
+    color: var(--text2);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: all 0.2s;
+  }
+  .key-btn:active { background: var(--bg2); transform: scale(0.97); }
+  .key-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--red); }
+  .key-dot.ok { background: var(--green); }
+
+  /* TABS */
+  .tabs {
+    display: flex;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .tab {
+    flex: 1;
+    padding: 12px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--text2);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    font-weight: 500;
+  }
+  .tab.active { color: var(--accent2); border-bottom-color: var(--accent2); }
+
+  /* SCROLL AREA */
+  .screen { display: none; flex: 1; overflow-y: auto; padding: 16px; }
+  .screen.active { display: block; }
+  .screen::-webkit-scrollbar { display: none; }
+
+  /* FORM */
+  .section-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text2);
+    margin-bottom: 10px;
+    margin-top: 20px;
+  }
+  .section-label:first-child { margin-top: 0; }
+  .input-group { margin-bottom: 12px; }
+  .input-group label { display: block; font-size: 13px; color: var(--text2); margin-bottom: 6px; }
+  .input-group input, .input-group select, .input-group textarea {
+    width: 100%;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    font-size: 15px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    outline: none;
+    transition: border-color 0.2s;
+    -webkit-appearance: none;
+  }
+  .input-group input:focus, .input-group select:focus, .input-group textarea:focus {
+    border-color: var(--accent);
+  }
+  .input-group textarea { resize: none; height: 80px; }
+  .input-group select option { background: #1a1a30; }
+
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  /* CHIPS */
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .chip {
+    padding: 7px 13px;
+    border-radius: 20px;
+    font-size: 13px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text2);
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+  }
+  .chip.selected { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .chip:active { transform: scale(0.95); }
+
+  /* GENERATE BTN */
+  .gen-btn {
+    width: 100%;
+    padding: 16px;
+    background: linear-gradient(135deg, var(--accent), #5b4dd4);
+    border: none;
+    border-radius: var(--radius);
+    font-size: 16px;
+    font-weight: 600;
+    color: #fff;
+    cursor: pointer;
+    margin-top: 20px;
+    margin-bottom: 30px;
+    transition: all 0.2s;
+    font-family: 'DM Sans', sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .gen-btn:active { transform: scale(0.98); opacity: 0.9; }
+  .gen-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* LOADER */
+  .loader {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    text-align: center;
+    gap: 20px;
+  }
+  .loader.visible { display: flex; }
+  .spinner {
+    width: 48px; height: 48px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent2);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loader-text { color: var(--text2); font-size: 14px; }
+  .loader-tip { font-size: 12px; color: var(--text2); opacity: 0.6; max-width: 260px; line-height: 1.5; }
+
+  /* RESULT */
+  .result-area { display: none; }
+  .result-area.visible { display: block; }
+
+  .day-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+  .day-header {
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    background: var(--bg3);
+  }
+  .day-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--accent2);
+  }
+  .day-kcal { font-size: 12px; color: var(--text2); }
+  .day-chevron { color: var(--text2); font-size: 14px; transition: transform 0.2s; }
+  .day-card.open .day-chevron { transform: rotate(180deg); }
+  .day-body { display: none; padding: 14px 16px; }
+  .day-card.open .day-body { display: block; }
+
+  .meal {
+    margin-bottom: 14px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .meal:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+  .meal-time {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    margin-bottom: 4px;
+  }
+  .meal-name { font-size: 14px; font-weight: 500; margin-bottom: 4px; }
+  .meal-desc { font-size: 12px; color: var(--text2); line-height: 1.5; }
+  .meal-macros {
+    display: flex;
+    gap: 10px;
+    margin-top: 6px;
+  }
+  .macro {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 20px;
+    background: rgba(124,106,247,0.1);
+    color: var(--accent2);
+  }
+  .macro.p { background: rgba(52,211,153,0.1); color: var(--green); }
+  .macro.f { background: rgba(251,146,60,0.1); color: var(--orange); }
+
+  /* RECIPE LINKS */
+  .recipe-links { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .recipe-btn {
+    display: flex; align-items: center; gap: 4px;
+    padding: 5px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 500;
+    text-decoration: none;
+    border: 1px solid var(--border);
+    background: var(--bg3);
+    color: var(--text2);
+    transition: all 0.2s;
+    cursor: pointer;
+  }
+  .recipe-btn:active { transform: scale(0.95); opacity: 0.8; }
+  .recipe-btn.google { border-color: rgba(66,133,244,0.3); color: #7baaf7; }
+  .recipe-btn.kwestia { border-color: rgba(52,211,153,0.3); color: var(--green); }
+
+  /* SUMMARY */
+  .summary-card {
+    background: linear-gradient(135deg, rgba(124,106,247,0.15), rgba(52,211,153,0.08));
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .summary-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 15px;
+    margin-bottom: 12px;
+  }
+  .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .summary-stat { text-align: center; }
+  .summary-val { font-size: 22px; font-weight: 700; color: var(--accent2); }
+  .summary-lbl { font-size: 11px; color: var(--text2); margin-top: 2px; }
+
+  .action-row { display: flex; gap: 10px; margin-bottom: 20px; }
+  .action-btn {
+    flex: 1;
+    padding: 13px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    transition: all 0.2s;
+  }
+  .action-btn:active { transform: scale(0.97); }
+  .action-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  /* KEY MODAL */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 100;
+    align-items: flex-end;
+  }
+  .modal-overlay.visible { display: flex; }
+  .modal {
+    background: var(--bg2);
+    border-radius: 20px 20px 0 0;
+    border-top: 1px solid var(--border);
+    padding: 24px 20px 40px;
+    width: 100%;
+    animation: slideUp 0.25s ease;
+  }
+  @keyframes slideUp { from { transform: translateY(100%); } }
+  .modal-title { font-family: 'Playfair Display', serif; font-size: 18px; margin-bottom: 6px; }
+  .modal-sub { font-size: 13px; color: var(--text2); margin-bottom: 20px; line-height: 1.5; }
+  .modal-input {
+    width: 100%;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 13px 14px;
+    font-size: 14px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    outline: none;
+    margin-bottom: 12px;
+  }
+  .modal-btns { display: flex; gap: 10px; }
+  .modal-save {
+    flex: 1;
+    padding: 14px;
+    background: var(--accent);
+    border: none;
+    border-radius: var(--radius-sm);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .modal-cancel {
+    padding: 14px 18px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text2);
+    font-size: 15px;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  /* EMPTY STATE */
+  .empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 30px;
+    text-align: center;
+    gap: 12px;
+  }
+  .empty-icon { font-size: 48px; }
+  .empty-title { font-family: 'Playfair Display', serif; font-size: 18px; }
+  .empty-sub { font-size: 13px; color: var(--text2); line-height: 1.5; }
+
+  /* TIPS */
+  .tip-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    font-size: 13px;
+    color: var(--text2);
+    line-height: 1.6;
+  }
+  .tip-head { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+
+  /* TOAST */
+  .toast {
+    position: fixed;
+    bottom: 90px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 30px;
+    padding: 10px 20px;
+    font-size: 13px;
+    color: var(--text);
+    opacity: 0;
+    transition: all 0.3s;
+    white-space: nowrap;
+    z-index: 200;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* SAVED */
+  .saved-item {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .saved-item:active { transform: scale(0.98); }
+  .saved-name { font-weight: 500; font-size: 15px; margin-bottom: 4px; }
+  .saved-meta { font-size: 12px; color: var(--text2); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="header-title">NutriAI</div>
+    <div class="header-sub">Generator jadłospisów</div>
+  </div>
+  <button class="key-btn" onclick="openKeyModal()" id="keyBtn">
+    <span class="key-dot" id="keyDot"></span> Klucz API
+  </button>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('form')">⚡ Generuj</div>
+  <div class="tab" onclick="switchTab('result')">🥗 Jadłospis</div>
+  <div class="tab" onclick="switchTab('saved')">📋 Zapisane</div>
+</div>
+
+<!-- FORM SCREEN -->
+<div class="screen active" id="screen-form">
+
+  <div class="section-label">Podstawowe dane</div>
+  <div class="row2">
+    <div class="input-group">
+      <label>Wiek</label>
+      <input type="number" id="age" placeholder="25" min="10" max="99">
+    </div>
+    <div class="input-group">
+      <label>Płeć</label>
+      <select id="gender">
+        <option value="kobieta">Kobieta</option>
+        <option value="mężczyzna">Mężczyzna</option>
+      </select>
+    </div>
+  </div>
+  <div class="row2">
+    <div class="input-group">
+      <label>Wzrost (cm)</label>
+      <input type="number" id="height" placeholder="170" min="140" max="220">
+    </div>
+    <div class="input-group">
+      <label>Waga (kg)</label>
+      <input type="number" id="weight" placeholder="70" min="30" max="200">
+    </div>
+  </div>
+
+  <div class="section-label">Aktywność fizyczna</div>
+  <div class="chips" id="activityChips">
+    <div class="chip" data-val="sedentarny">🪑 Siedzący</div>
+    <div class="chip" data-val="lekko aktywny">🚶 Lekko aktywny</div>
+    <div class="chip selected" data-val="umiarkowanie aktywny">🏃 Umiarkowany</div>
+    <div class="chip" data-val="bardzo aktywny">💪 Bardzo aktywny</div>
+  </div>
+
+  <div class="section-label">Cel</div>
+  <div class="chips" id="goalChips">
+    <div class="chip" data-val="redukcja wagi">📉 Redukcja</div>
+    <div class="chip selected" data-val="utrzymanie wagi">⚖️ Utrzymanie</div>
+    <div class="chip" data-val="przyrost masy">📈 Masa</div>
+  </div>
+
+  <div class="section-label">Dieta</div>
+  <div class="chips" id="dietChips">
+    <div class="chip selected" data-val="tradycyjna">🍖 Tradycyjna</div>
+    <div class="chip" data-val="wegetariańska">🥦 Wegetariańska</div>
+    <div class="chip" data-val="wegańska">🌱 Wegańska</div>
+    <div class="chip" data-val="ketogeniczna">🥑 Keto</div>
+    <div class="chip" data-val="śródziemnomorska">🫒 Śródziemnomor.</div>
+  </div>
+
+  <div class="section-label">Liczba posiłków dziennie</div>
+  <div class="chips" id="mealsChips">
+    <div class="chip" data-val="3">3 posiłki</div>
+    <div class="chip selected" data-val="4">4 posiłki</div>
+    <div class="chip" data-val="5">5 posiłków</div>
+  </div>
+
+  <div class="section-label">Alergie / wykluczenia</div>
+  <div class="input-group">
+    <textarea id="allergies" placeholder="np. gluten, laktoza, orzechy..."></textarea>
+  </div>
+
+  <div class="section-label">Długość planu</div>
+  <div class="chips" id="daysChips">
+    <div class="chip" data-val="3">3 dni</div>
+    <div class="chip selected" data-val="5">5 dni</div>
+    <div class="chip" data-val="7">7 dni</div>
+  </div>
+
+  <div class="section-label">Serwis przepisów</div>
+  <div class="chips" id="recipeChips">
+    <div class="chip selected" data-val="both">🔍+🍳 Oba</div>
+    <div class="chip" data-val="google">🔍 Google</div>
+    <div class="chip" data-val="kwestia">🍳 Kwestia Smaku</div>
+    <div class="chip" data-val="none">❌ Brak</div>
+  </div>
+
+  <button class="gen-btn" id="genBtn" onclick="generate()">
+    ✨ Generuj jadłospis
+  </button>
+</div>
+
+<!-- RESULT SCREEN -->
+<div class="screen" id="screen-result">
+  <div class="loader" id="loader">
+    <div class="spinner"></div>
+    <div class="loader-text" id="loaderText">Generuję Twój jadłospis...</div>
+    <div class="loader-tip">AI analizuje Twoje potrzeby i dobiera optymalne posiłki 🌿</div>
+  </div>
+  <div class="empty" id="emptyResult">
+    <div class="empty-icon">🍽️</div>
+    <div class="empty-title">Brak jadłospisu</div>
+    <div class="empty-sub">Wypełnij formularz w zakładce "Generuj" i wygeneruj swój spersonalizowany plan żywienia.</div>
+  </div>
+  <div class="result-area" id="resultArea"></div>
+</div>
+
+<!-- SAVED SCREEN -->
+<div class="screen" id="screen-saved">
+  <div class="empty" id="emptySaved">
+    <div class="empty-icon">📋</div>
+    <div class="empty-title">Brak zapisanych</div>
+    <div class="empty-sub">Wygeneruj jadłospis i zapisz go, aby mieć dostęp offline.</div>
+  </div>
+  <div id="savedList"></div>
+</div>
+
+<!-- KEY MODAL -->
+<div class="modal-overlay" id="keyModal" onclick="closeModalOutside(event)">
+  <div class="modal">
+    <div class="modal-title">Klucz API Gemini</div>
+    <div class="modal-sub">
+      Pobierz darmowy klucz na <strong>aistudio.google.com/apikey</strong> — wymagane konto Google. Klucz jest zapisywany tylko na Twoim urządzeniu.
+    </div>
+    <input type="password" class="modal-input" id="apiKeyInput" placeholder="AIzaSy...">
+    <div class="modal-btns">
+      <button class="modal-cancel" onclick="closeKeyModal()">Anuluj</button>
+      <button class="modal-save" onclick="saveKey()">Zapisz klucz</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let apiKey = localStorage.getItem('gemini_key') || '';
+let currentResult = null;
+
+// Init
+updateKeyBtn();
+initChips();
+loadSaved();
+
+function updateKeyBtn() {
+  const dot = document.getElementById('keyDot');
+  dot.className = apiKey ? 'key-dot ok' : 'key-dot';
+}
+
+function initChips() {
+  document.querySelectorAll('.chips').forEach(group => {
+    group.querySelectorAll('.chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        group.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+        chip.classList.add('selected');
+      });
+    });
+  });
+}
+
+function getChipVal(id) {
+  const el = document.querySelector(`#${id} .chip.selected`);
+  return el ? el.dataset.val : '';
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.remove('active'));
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const tabs = ['form','result','saved'];
+  const idx = tabs.indexOf(name);
+  document.querySelectorAll('.tab')[idx].classList.add('active');
+  document.getElementById(`screen-${name}`).classList.add('active');
+}
+
+function openKeyModal() {
+  document.getElementById('apiKeyInput').value = apiKey;
+  document.getElementById('keyModal').classList.add('visible');
+}
+function closeKeyModal() { document.getElementById('keyModal').classList.remove('visible'); }
+function closeModalOutside(e) { if(e.target.id==='keyModal') closeKeyModal(); }
+function saveKey() {
+  const val = document.getElementById('apiKeyInput').value.trim();
+  apiKey = val;
+  localStorage.setItem('gemini_key', val);
+  updateKeyBtn();
+  closeKeyModal();
+  showToast(val ? '✅ Klucz zapisany' : '🗑️ Klucz usunięty');
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+const loaderMessages = [
+  'Obliczam Twoje zapotrzebowanie kaloryczne...',
+  'Dobieram składniki odżywcze...',
+  'Układam plan posiłków...',
+  'Optymalizuję jadłospis...',
+  'Prawie gotowe! 🌿',
+];
+
+async function generate() {
+  if (!apiKey) { openKeyModal(); showToast('⚠️ Wpisz najpierw klucz API'); return; }
+
+  const age = document.getElementById('age').value;
+  const gender = document.getElementById('gender').value;
+  const height = document.getElementById('height').value;
+  const weight = document.getElementById('weight').value;
+  if (!age || !height || !weight) { showToast('⚠️ Uzupełnij dane podstawowe'); return; }
+
+  const activity = getChipVal('activityChips');
+  const goal = getChipVal('goalChips');
+  const diet = getChipVal('dietChips');
+  const meals = getChipVal('mealsChips');
+  const days = getChipVal('daysChips');
+  const allergies = document.getElementById('allergies').value;
+
+  // Switch to result tab
+  switchTab('result');
+  document.getElementById('loader').classList.add('visible');
+  document.getElementById('emptyResult').style.display = 'none';
+  document.getElementById('resultArea').classList.remove('visible');
+
+  // Animate loader messages
+  let msgIdx = 0;
+  const msgInterval = setInterval(() => {
+    if (msgIdx < loaderMessages.length) {
+      document.getElementById('loaderText').textContent = loaderMessages[msgIdx++];
+    }
+  }, 2000);
+
+  async function callGemini(prompt) {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 8192,
+          responseMimeType: 'application/json',
+          thinkingConfig: { thinkingBudget: 0 }
+        }
+      })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error?.message || 'Błąd API');
+    }
+    const data = await res.json();
+    let text = data.candidates[0]?.content?.parts[0]?.text || '';
+    text = text.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+    return JSON.parse(text);
+  }
+
+  try {
+    document.getElementById('loaderText').textContent = 'Generuję jadłospis...';
+
+    const prompt = `Jadłospis na ${days} dni. Osoba: ${gender}, ${age} lat, ${height} cm, ${weight} kg, aktywność: ${activity}, cel: ${goal}, dieta: ${diet}, ${meals} posiłków/dzień${allergies ? ', bez: '+allergies : ''}. Zwróć JSON: {"kcal_dziennie":number,"bialko_g":number,"tluszcze_g":number,"weglowodany_g":number,"dni":[{"dzien":"string","posilki":[{"pora":"string","nazwa":"string","kcal":number,"bialko_g":number,"tluszcze_g":number,"weglowodany_g":number}]}],"wskazowki":["string"]}. Bez pola opis. Nazwy posiłków max 5 słów. 3 wskazówki.`;
+
+    const json = await callGemini(prompt);
+    clearInterval(msgInterval);
+
+    currentResult = { json, params: { age, gender, height, weight, goal, diet, days }, date: new Date().toLocaleDateString('pl') };
+    renderResult(json);
+
+  } catch(e) {
+    clearInterval(msgInterval);
+    document.getElementById('loader').classList.remove('visible');
+    document.getElementById('emptyResult').style.display = 'flex';
+    document.getElementById('emptyResult').querySelector('.empty-sub').textContent = 'Błąd: ' + e.message;
+    showToast('❌ ' + e.message.substring(0, 40));
+  }
+}
+
+function renderResult(json) {
+  document.getElementById('loader').classList.remove('visible');
+  const recipeMode = getChipVal('recipeChips') || 'both';
+  const area = document.getElementById('resultArea');
+  area.innerHTML = '';
+
+  // Summary
+  const summary = document.createElement('div');
+  summary.className = 'summary-card';
+  summary.innerHTML = `
+    <div class="summary-title">📊 Twoje makroskładniki / dzień</div>
+    <div class="summary-grid">
+      <div class="summary-stat"><div class="summary-val">${json.kcal_dziennie}</div><div class="summary-lbl">kcal</div></div>
+      <div class="summary-stat"><div class="summary-val">${json.bialko_g}g</div><div class="summary-lbl">Białko</div></div>
+      <div class="summary-stat"><div class="summary-val">${json.tluszcze_g}g</div><div class="summary-lbl">Tłuszcze</div></div>
+      <div class="summary-stat"><div class="summary-val">${json.weglowodany_g}g</div><div class="summary-lbl">Węglowodany</div></div>
+    </div>`;
+  area.appendChild(summary);
+
+  // Action buttons
+  const actions = document.createElement('div');
+  actions.className = 'action-row';
+  actions.innerHTML = `
+    <button class="action-btn primary" onclick="saveCurrentResult()">💾 Zapisz</button>
+    <button class="action-btn" onclick="shareResult()">📤 Udostępnij</button>`;
+  area.appendChild(actions);
+
+  // Days
+  json.dni.forEach((day, i) => {
+    const card = document.createElement('div');
+    card.className = 'day-card';
+    const totalKcal = day.posilki.reduce((s,m) => s+(m.kcal||0), 0);
+
+    const header = document.createElement('div');
+    header.className = 'day-header';
+    header.innerHTML = `<div><div class="day-name">${day.dzien}</div><div class="day-kcal">${totalKcal} kcal</div></div><span class="day-chevron">▼</span>`;
+    header.onclick = () => card.classList.toggle('open');
+    card.appendChild(header);
+
+    const body = document.createElement('div');
+    body.className = 'day-body';
+
+    day.posilki.forEach(m => {
+      const meal = document.createElement('div');
+      meal.className = 'meal';
+
+      let html = `<div class="meal-time">${m.pora}</div>`;
+      html += `<div class="meal-name">${m.nazwa}</div>`;
+      if (m.opis) html += `<div class="meal-desc">${m.opis}</div>`;
+      html += `<div class="meal-macros">
+        <span class="macro">${m.kcal} kcal</span>
+        <span class="macro p">B: ${m.bialko_g}g</span>
+        <span class="macro f">T: ${m.tluszcze_g}g</span>
+        <span class="macro">W: ${m.weglowodany_g}g</span>
+      </div>`;
+
+      if (recipeMode !== 'none') {
+        const q = encodeURIComponent(m.nazwa);
+        let links = '<div class="recipe-links">';
+        if (recipeMode === 'google' || recipeMode === 'both') {
+          links += `<a class="recipe-btn google" href="https://www.google.com/search?q=przepis+${q}" target="_blank">🔍 Google</a>`;
+        }
+        if (recipeMode === 'kwestia' || recipeMode === 'both') {
+          links += `<a class="recipe-btn kwestia" href="https://www.kwestiasmaku.com/szukaj?search_api_views_fulltext=${q}" target="_blank">🍳 Kwestia Smaku</a>`;
+        }
+        links += '</div>';
+        html += links;
+      }
+
+      meal.innerHTML = html;
+      body.appendChild(meal);
+    });
+
+    card.appendChild(body);
+    area.appendChild(card);
+    if (i === 0) card.classList.add('open');
+  });
+
+  // Tips
+  if (json.wskazowki?.length) {
+    const tipsLabel = document.createElement('div');
+    tipsLabel.className = 'section-label';
+    tipsLabel.style.marginTop = '20px';
+    tipsLabel.textContent = 'Wskazówki żywieniowe';
+    area.appendChild(tipsLabel);
+    json.wskazowki.forEach(tip => {
+      const tc = document.createElement('div');
+      tc.className = 'tip-card';
+      tc.textContent = '💡 ' + tip;
+      area.appendChild(tc);
+    });
+  }
+
+  area.classList.add('visible');
+  area.style.paddingBottom = '30px';
+}
+
+function toggleDay(card) {
+  card.classList.toggle('open');
+}
+
+function saveCurrentResult() {
+  if (!currentResult) return;
+  const saved = JSON.parse(localStorage.getItem('saved_plans') || '[]');
+  const name = `${currentResult.params.goal} — ${currentResult.params.diet} (${currentResult.date})`;
+  saved.unshift({ name, data: currentResult, id: Date.now() });
+  localStorage.setItem('saved_plans', JSON.stringify(saved.slice(0, 20)));
+  loadSaved();
+  showToast('✅ Zapisano!');
+}
+
+function loadSaved() {
+  const saved = JSON.parse(localStorage.getItem('saved_plans') || '[]');
+  const list = document.getElementById('savedList');
+  const empty = document.getElementById('emptySaved');
+  if (!saved.length) { list.innerHTML=''; empty.style.display='flex'; return; }
+  empty.style.display = 'none';
+  list.innerHTML = saved.map(s => `
+    <div class="saved-item" onclick="loadSavedPlan(${s.id})">
+      <div class="saved-name">${s.name}</div>
+      <div class="saved-meta">${s.data.json.kcal_dziennie} kcal/dzień · ${s.data.json.dni.length} dni · ${s.data.params.diet}</div>
+    </div>`).join('');
+}
+
+function loadSavedPlan(id) {
+  const saved = JSON.parse(localStorage.getItem('saved_plans') || '[]');
+  const plan = saved.find(s => s.id === id);
+  if (!plan) return;
+  currentResult = plan.data;
+  renderResult(plan.data.json);
+  switchTab('result');
+}
+
+function shareResult() {
+  if (!currentResult) return;
+  const text = `Mój plan żywienia NutriAI:\n${currentResult.json.kcal_dziennie} kcal/dzień\nBiałko: ${currentResult.json.bialko_g}g | Tłuszcze: ${currentResult.json.tluszcze_g}g | Węglowodany: ${currentResult.json.weglowodany_g}g\n\nWygenerowano przez NutriAI 🌿`;
+  if (navigator.share) {
+    navigator.share({ title: 'NutriAI — Mój jadłospis', text });
+  } else {
+    navigator.clipboard.writeText(text);
+    showToast('📋 Skopiowano do schowka');
+  }
+}
+</script>
+</body>
+</html>

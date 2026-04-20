@@ -856,6 +856,7 @@
     <div class="chip" data-val="wegańska">🌱 Wegańska</div>
     <div class="chip" data-val="ketogeniczna">🥑 Keto</div>
     <div class="chip" data-val="śródziemnomorska">🫒 Śródziemnomor.</div>
+    <div class="chip" data-val="dabrowska">🌿 Dr Dąbrowska</div>
   </div>
 
   <div class="section-label">Liczba posiłków dziennie</div>
@@ -1226,16 +1227,31 @@ async function generate() {
       }[disease] || ''
     }[mode] || '';
 
-    const specjalneNormy = mode === 'ciaza' ? ' Dzienna norma kaloryczna +300 kcal powyżej standardu.' :
-                           mode === 'laktacja' ? ' Dzienna norma kaloryczna +500 kcal powyżej standardu.' : '';
+    // Wytyczne diety Dąbrowskiej (niezależne od trybu)
+    const dabrowskaOpis = diet === 'dabrowska' ?
+      `DIETA DR DĄBROWSKIEJ (post warzywno-owocowy):
+Zasady bezwzględne:
+- TYLKO surowe i gotowane warzywa nieskrobiowe oraz wybrane owoce
+- Dozwolone warzywa: marchew, brokuł, kalafior, szpinak, sałata, ogórek, pomidor, papryka, cukinia, seler, pietruszka, por, rzodkiewka, buraki, kapusta, jarmuż, szparagi
+- Dozwolone owoce: jabłko, cytrusy (pomarańcza, grejpfrut, cytryna), truskawki, borówki, maliny, kiwi
+- BEZWZGLĘDNIE wykluczone: mięso, ryby, nabiał, jajka, zboża, pieczywo, makarony, kasze, rośliny strączkowe, ziemniaki, banany, winogrona, mango, daktyle, rodzynki
+- Wykluczone: cukier, sól, tłuszcze dodane (oleje, masło), alkohol, kawa, herbata czarna
+- Dozwolone: herbatki ziołowe, woda, sok warzywny bez soli
+- Kaloryczność: 500-800 kcal/dzień (faza podstawowa postu)
+- Posiłki: surówki, sałatki, zupy warzywne bez soli, smoothie warzywno-owocowe, warzywa gotowane na parze
+- Wskazówki muszą zawierać informację o konieczności konsultacji z lekarzem` : '';
 
-    // Lista produktów z bazy
-    const bazaHint = "pierś z kurczaka, udo z kurczaka, indyk pierś, wołowina chuda, łosoś, tuńczyk w wodzie, dorsz, makrela, jajko, mleko 2%, mleko 3.2%, mleko odtłuszczone, mleko sojowe, mleko owsiane, jogurt naturalny, jogurt grecki, skyr, ser twarogowy chudy, ser twarogowy półtłusty, ser żółty, mozzarella, feta, serek wiejski, kefir, maślanka, ryż biały, ryż brązowy, makaron pszenny, makaron pełnoziarnisty, kasza gryczana, kasza jaglana, kasza bulgur, płatki owsiane, quinoa, chleb żytni, chleb graham, tortilla pszenna, ziemniaki, bataty, marchew, brokuł, szpinak, pomidor, ogórek, papryka czerwona, cebula, czosnek, kapusta biała, sałata, kukurydza, groszek zielony, buraki, cukinia, jarmuż, szparagi, grzyby pieczarki, fasola szparagowa, brukselka, jabłko, banan, pomarańcza, truskawki, borówki, kiwi, awokado, soczewica czerwona, soczewica zielona, ciecierzyca, fasola czerwona, fasola biała, tofu, tempeh, edamame, migdały, orzechy włoskie, nasiona dyni, siemię lniane, nasiona chia, masło orzechowe, oliwa z oliwek, olej rzepakowy, miód";
+    const specjalneNormy = mode === 'ciaza' ? ' Dzienna norma kaloryczna +300 kcal powyżej standardu.' :
+                           mode === 'laktacja' ? ' Dzienna norma kaloryczna +500 kcal powyżej standardu.' :
+                           diet === 'dabrowska' ? ' Kaloryczność 500-800 kcal/dzień (post leczniczy).' : '';
+
+    // Lista produktów z bazy (dla Dąbrowskiej tylko warzywa i owoce)
+    const bazaHint = diet === 'dabrowska'
+      ? "marchew, brokuł, kalafior, szpinak, sałata, ogórek, pomidor, papryka czerwona, papryka żółta, cebula, kapusta biała, kapusta czerwona, sałata lodowa, rukola, jarmuż, szparagi, cukinia, bakłażan, seler naciowy, seler korzeniowy, natka pietruszki, por, rzodkiewka, grzyby pieczarki, buraki, jabłko, pomarańcza, grejpfrut, cytryna, truskawki, borówki, maliny, kiwi"
+      : "pierś z kurczaka, udo z kurczaka, indyk pierś, wołowina chuda, łosoś, tuńczyk w wodzie, dorsz, makrela, jajko, mleko 2%, mleko 3.2%, mleko odtłuszczone, mleko sojowe, mleko owsiane, jogurt naturalny, jogurt grecki, skyr, ser twarogowy chudy, ser twarogowy półtłusty, ser żółty, mozzarella, feta, serek wiejski, kefir, maślanka, ryż biały, ryż brązowy, makaron pszenny, makaron pełnoziarnisty, kasza gryczana, kasza jaglana, kasza bulgur, płatki owsiane, quinoa, chleb żytni, chleb graham, tortilla pszenna, ziemniaki, bataty, marchew, brokuł, szpinak, pomidor, ogórek, papryka czerwona, cebula, czosnek, kapusta biała, sałata, kukurydza, groszek zielony, buraki, cukinia, jarmuż, szparagi, grzyby pieczarki, fasola szparagowa, brukselka, jabłko, banan, pomarańcza, truskawki, borówki, kiwi, awokado, soczewica czerwona, soczewica zielona, ciecierzyca, fasola czerwona, fasola biała, tofu, tempeh, edamame, migdały, orzechy włoskie, nasiona dyni, siemię lniane, nasiona chia, masło orzechowe, oliwa z oliwek, olej rzepakowy, miód";
 
     const prompt = `Ułóż profesjonalny jadłospis na ${days} dni dla osoby: ${gender}, ${age} lat, ${height} cm, ${weight} kg, aktywność: ${activity}, cel: ${goal}, dieta: ${diet}, ${meals} posiłków/dzień${allergies ? ', wykluczone: '+allergies : ''}.${specjalneNormy}
-${trybOpis ? `
-WYTYCZNE KLINICZNE: ${trybOpis}
-` : ''}
+${trybOpis ? `\nWYTYCZNE KLINICZNE: ${trybOpis}\n` : ''}${dabrowskaOpis ? `\n${dabrowskaOpis}\n` : ''}
 Zasady:
 1. Każdy dzień musi być inny — nie powtarzaj tych samych posiłków
 2. Używaj DOKŁADNIE tych nazw składników (baza IŻŻ): ${bazaHint}
@@ -1304,6 +1320,19 @@ function renderResult(json) {
     warn.innerHTML = `<strong>🤱 Tryb laktacji</strong><br>
       Jadłospis uwzględnia zwiększone zapotrzebowanie energetyczne (+500 kcal) i wapń. 
       Skonsultuj dietę z lekarzem lub doradcą laktacyjnym.`;
+    area.appendChild(warn);
+  }
+  if (diet === 'dabrowska') {
+    const warn = document.createElement('div');
+    warn.className = 'clinical-warn';
+    warn.style.borderColor = 'rgba(52,211,153,0.3)';
+    warn.style.background = 'rgba(52,211,153,0.07)';
+    warn.innerHTML = `<strong style="color:#34d399">🌿 Dieta dr Dąbrowskiej — post warzywno-owocowy</strong><br>
+      To dieta niskokaloryczna (500–800 kcal/dzień) oparta wyłącznie na warzywach i wybranych owocach.
+      <br><br>
+      <strong style="color:#fca5a5">⚠️ Ważne:</strong> Jest to post leczniczy wymagający <strong>obowiązkowej konsultacji z lekarzem</strong> przed rozpoczęciem. 
+      Nie stosuj przy cukrzycy, chorobach nerek, w ciąży, przy niedowadze ani u dzieci. 
+      Maksymalny czas trwania fazy podstawowej: 2–6 tygodni pod nadzorem medycznym.`;
     area.appendChild(warn);
   }
 

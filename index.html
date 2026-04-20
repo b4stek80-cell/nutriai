@@ -1267,6 +1267,7 @@ Nazwy posiłków max 5 słów. 5 praktycznych wskazówek dopasowanych do trybu i
 }
 
 function renderResult(json) {
+  const params = currentResult?.params || {};
   document.getElementById('loader').classList.remove('visible');
   const recipeMode = getChipVal('recipeChips') || 'both';
   const mode = getChipVal('modeChips') || 'standard';
@@ -2126,7 +2127,7 @@ async function exportToPDF() {
 // WYMIEŃ POSIŁEK — zamień jeden posiłek zachowując makra
 // ============================================================
 async function wymienPosilek(posilek, dzien, btn, mealEl, json, params) {
-  if (!apiKey) { openKeyModal(); return; }
+  if (!apiKey) { openKeyModal(); showToast('⚠️ Najpierw wpisz klucz API'); return; }
 
   btn.disabled = true;
   btn.innerHTML = '⏳ Szukam zamiennika...';
@@ -2140,7 +2141,7 @@ async function wymienPosilek(posilek, dzien, btn, mealEl, json, params) {
   const prompt = `Zaproponuj INNY posiłek zamiast "${posilek.nazwa}" na porę: ${posilek.pora}.
 Dieta: ${diet}${allergies ? ', wykluczone: '+allergies : ''}.${disease ? ' Jednostka: '+disease+'.' : ''}
 Zachowaj zbliżone makroskładniki: ~${posilek.kcal} kcal, białko ~${posilek.bialko_g}g, tłuszcze ~${posilek.tluszcze_g}g, węglowodany ~${posilek.weglowodany_g}g.
-Podaj inny posiłek niż: ${dzien.posilki.map(p=>p.nazwa).join(', ')}.
+Podaj inny posiłek niż: ${(dzien.posilki||[]).map(p=>p.nazwa).join(', ')}.
 
 Zwróć TYLKO JSON:
 {"pora":"${posilek.pora}","nazwa":"string","skladniki":["składnik Xg"],"kcal":number,"bialko_g":number,"tluszcze_g":number,"weglowodany_g":number}`;
@@ -2156,10 +2157,14 @@ Zwróć TYLKO JSON:
         })
       }
     );
-    if (!res.ok) throw new Error('Błąd API');
+    if (!res.ok) {
+      const errData = await res.json().catch(()=>({}));
+      throw new Error(errData.error?.message || `HTTP ${res.status}`);
+    }
     const data = await res.json();
     let text = data.candidates[0]?.content?.parts[0]?.text || '';
     text = text.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+    if (!text) throw new Error('Pusta odpowiedź API');
     const nowyPosilek = JSON.parse(text);
 
     // Oblicz makra z bazy

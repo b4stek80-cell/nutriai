@@ -797,13 +797,15 @@
   </button>
 </div>
 
+
+
 <div class="tabs">
   <div class="tab active" onclick="switchTab('form')">⚡ Generuj</div>
   <div class="tab" onclick="switchTab('result')">🥗 Jadłospis</div>
   <div class="tab" onclick="switchTab('shopping')">🛒 Zakupy</div>
   <div class="tab" onclick="switchTab('diary')">📔 Dziennik</div>
   <div class="tab" onclick="switchTab('saved')">💾 Zapisane</div>
-  <div class="tab" onclick="switchTab('baza')" id="bazaTab">🗄️ Baza</div>
+  <div class="tab" onclick="switchTab('baza')" id="bazaTab" title="Narzędzia zaawansowane">⚙️</div>
 </div>
 
 <!-- FORM SCREEN -->
@@ -826,12 +828,32 @@
   <div class="row2">
     <div class="input-group">
       <label>Wzrost (cm)</label>
-      <input type="number" id="height" placeholder="170" min="140" max="220">
+      <input type="number" id="height" placeholder="170" min="140" max="220" oninput="obliczBMI()">
     </div>
     <div class="input-group">
       <label>Waga (kg)</label>
-      <input type="number" id="weight" placeholder="70" min="30" max="200">
+      <input type="number" id="weight" placeholder="70" min="30" max="200" oninput="obliczBMI()">
     </div>
+  </div>
+
+  <!-- Kalkulator BMI -->
+  <div id="bmiCard" style="display:none;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+      <span style="font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.08em;">BMI</span>
+      <span id="bmiKategoriaBadge" style="font-size:11px;padding:3px 10px;border-radius:20px;font-weight:600;"></span>
+    </div>
+    <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:10px;">
+      <span id="bmiWartosc" style="font-size:32px;font-weight:700;color:var(--accent2);"></span>
+      <span style="font-size:12px;color:var(--text2);">kg/m²</span>
+    </div>
+    <!-- Pasek BMI -->
+    <div style="position:relative;height:8px;border-radius:4px;background:linear-gradient(to right,#60a5fa 0%,#34d399 18.5%,#34d399 25%,#fb923c 30%,#f87171 40%,#dc2626 100%);margin-bottom:6px;overflow:visible;">
+      <div id="bmiWskaznik" style="position:absolute;top:-4px;width:3px;height:16px;background:#fff;border-radius:2px;box-shadow:0 0 4px rgba(0,0,0,0.5);transform:translateX(-50%);transition:left 0.4s ease;"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text2);margin-bottom:8px;">
+      <span>16</span><span>18.5</span><span>25</span><span>30</span><span>40</span>
+    </div>
+    <div id="bmiOpis" style="font-size:11px;color:var(--text2);line-height:1.5;"></div>
   </div>
 
   <div class="section-label">Aktywność fizyczna</div>
@@ -866,9 +888,18 @@
     <div class="chip" data-val="5">5 posiłków</div>
   </div>
 
-  <div class="section-label">Alergie / wykluczenia</div>
+  <div class="section-label">Alergie / wykluczenia produktów</div>
   <div class="input-group">
-    <textarea id="allergies" placeholder="np. gluten, laktoza, orzechy..."></textarea>
+    <textarea id="allergies" placeholder="np. gluten, laktoza, orzechy, jajka..."></textarea>
+  </div>
+
+  <div class="section-label">Dodatkowe wytyczne kliniczne</div>
+  <div class="input-group">
+    <textarea id="wytyczneKliniczne" placeholder="np. menopauza, podwyższone LDL, nadciśnienie, stosunek Ca:P 1:1, insulinooporność, żaden posiłek się nie powtarza..." style="min-height:70px;"></textarea>
+  </div>
+  <div style="font-size:11px;color:var(--text2);margin-top:-8px;margin-bottom:12px;line-height:1.8;padding:0 2px;">
+    Tu wpisz dodatkowe schorzenia lub zalecenia lekarskie — AI uwzględni je przy generowaniu.<br>
+    <span style="opacity:0.75">Przykłady: <em>menopauza / podwyższone LDL / nadciśnienie / niedobór żelaza / stosunek Ca:P 1:1 / dieta niskosodowa / żaden posiłek się nie powtarza / unikaj produktów wysokoprzetworzonych</em></span>
   </div>
 
   <div class="section-label">Długość planu</div>
@@ -878,16 +909,16 @@
     <div class="chip" data-val="7">7 dni</div>
   </div>
 
-  <div class="section-label">Tryb specjalny</div>
+  <div class="section-label">Tryb diety</div>
   <div class="chips" id="modeChips">
     <div class="chip selected" data-val="standard">👤 Standardowy</div>
     <div class="chip" data-val="ciaza">🤰 Ciąża</div>
     <div class="chip" data-val="laktacja">🤱 Laktacja</div>
-    <div class="chip" data-val="kliniczny">🏥 Kliniczny</div>
+    <div class="chip" data-val="kliniczny">🏥 Specjalistyczny</div>
   </div>
 
   <div id="clinicalBlock" style="display:none;">
-    <div class="section-label">Jednostka chorobowa</div>
+    <div class="section-label">Uwzględnij schorzenie</div>
     <div class="chips" id="diseaseChips">
       <div class="chip selected" data-val="cukrzyca_t2">🩸 Cukrzyca T2</div>
       <div class="chip" data-val="insulinoopornosc">📉 Insulinooporność</div>
@@ -908,8 +939,23 @@
     <div class="chip" data-val="none">❌ Brak</div>
   </div>
 
+  <div class="section-label">Zapotrzebowanie kaloryczne</div>
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px;">
+    <div class="input-group" style="flex:1;margin-bottom:0;">
+      <input type="number" id="reczneKcal" placeholder="Auto (Mifflin-St Jeor)"
+        min="500" max="5000" step="50"
+        oninput="aktualizujPodgladKcal()"
+        style="text-align:center;">
+    </div>
+    <button onclick="wyczyścReczneKcal()"
+      style="padding:11px 13px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text2);font-size:13px;cursor:pointer;white-space:nowrap;font-family:'DM Sans',sans-serif;">
+      ✕ Auto
+    </button>
+  </div>
+  <div id="kcalPodglad" style="font-size:11px;color:var(--text2);margin-bottom:8px;min-height:16px;padding:0 2px;line-height:1.5;"></div>
+
   <button class="gen-btn" id="genBtn" onclick="generate()">
-    ✨ Generuj jadłospis
+    ✨ Generuj mój plan żywieniowy
   </button>
 </div>
 
@@ -943,6 +989,20 @@
   <div style="padding-bottom:20px;">
     <div class="section-label" style="margin-top:0;">Dziennik żywieniowy</div>
     <button class="add-diary-btn" onclick="addDiaryEntry()">+ Dodaj posiłek do dziennika</button>
+
+    <!-- Trend tygodniowy -->
+    <div id="diaryTrendCard" style="display:none;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <span style="font-size:13px;font-weight:600;color:var(--text)">📈 Trend kaloryczny (14 dni)</span>
+        <div style="display:flex;gap:8px;font-size:10px;">
+          <span style="display:flex;align-items:center;gap:3px;color:var(--accent2)"><span style="width:8px;height:8px;border-radius:50%;background:var(--accent2);display:inline-block"></span>kcal</span>
+          <span style="display:flex;align-items:center;gap:3px;color:var(--green)"><span style="width:8px;height:2px;background:var(--green);display:inline-block"></span>cel</span>
+        </div>
+      </div>
+      <canvas id="diaryTrendChart" height="80" style="width:100%;display:block;"></canvas>
+      <div id="diaryTrendStats" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.05);text-align:center;"></div>
+    </div>
+
     <div id="diaryList"></div>
     <div class="empty" id="emptyDiary" style="display:none;">
       <div class="empty-icon">📔</div>
@@ -1074,6 +1134,12 @@
 <div class="toast" id="toast"></div>
 
 <script>
+// Zaokrąglenie do 1 miejsca po przecinku — eliminuje błędy zmiennoprzecinkowe JS
+const r1 = v => Math.round((v||0) * 10) / 10;
+
+const BACKEND_URL = 'https://nutriai-backend-production-8991.up.railway.app';
+// Jeśli BACKEND_URL jest pusty, aplikacja wymaga klucza API od użytkownika (tryb legacy)
+
 let apiKey = localStorage.getItem('gemini_key') || '';
 let currentResult = null;
 
@@ -1083,6 +1149,8 @@ initChips();
 loadSaved();
 loadDiary();
 setTimeout(aktualizujStatystykiBazy, 500);
+
+
 
 function updateKeyBtn() {
   const dot = document.getElementById('keyDot');
@@ -1101,6 +1169,8 @@ function initChips() {
           document.getElementById('clinicalBlock').style.display =
             val === 'kliniczny' ? 'block' : 'none';
         }
+        // Walidacja miękka przy każdej zmianie chipa
+        walidujFormularz();
       });
     });
   });
@@ -1109,6 +1179,14 @@ function initChips() {
 function getChipVal(id) {
   const el = document.querySelector(`#${id} .chip.selected`);
   return el ? el.dataset.val : '';
+}
+
+function setChipVal(id, val) {
+  const group = document.getElementById(id);
+  if (!group) return;
+  group.querySelectorAll('.chip').forEach(c => {
+    c.classList.toggle('selected', c.dataset.val === val);
+  });
 }
 
 function switchTab(name) {
@@ -1135,6 +1213,165 @@ function saveKey() {
   showToast(val ? '✅ Klucz zapisany' : '🗑️ Klucz usunięty');
 }
 
+// ============================================================
+// KALKULATOR BMI — live po wpisaniu wagi i wzrostu
+// ============================================================
+// ============================================================
+// RĘCZNE ZAPOTRZEBOWANIE KALORYCZNE
+// ============================================================
+// ============================================================
+// WALIDACJA MIĘKKA — ostrzeżenia bez blokowania
+// ============================================================
+function walidujFormularz() {
+  const age = parseFloat(document.getElementById('age')?.value);
+  const h   = parseFloat(document.getElementById('height')?.value);
+  const w   = parseFloat(document.getElementById('weight')?.value);
+  const goal   = getChipVal('goalChips') || '';
+  const diet   = getChipVal('dietChips') || '';
+  const mode   = getChipVal('modeChips') || '';
+  const reczne = parseFloat(document.getElementById('reczneKcal')?.value);
+
+  const alerty = [];
+
+  if (h > 0 && w > 0) {
+    const bmi = w / ((h/100)**2);
+
+    // BMI vs cel
+    if (bmi >= 30 && goal === 'przyrost masy')
+      alerty.push('⚠️ BMI ' + Math.round(bmi*10)/10 + ' (otyłość) przy celu "masa mięśniowa" — rozważ najpierw redukcję wagi');
+    if (bmi < 18.5 && goal === 'redukcja wagi')
+      alerty.push('⚠️ BMI ' + Math.round(bmi*10)/10 + ' (niedowaga) — redukcja może być niebezpieczna. Rozważ cel "utrzymanie" lub "masa"');
+  }
+
+  // Ręczne kcal vs logika
+  if (reczne > 0) {
+    const bmr = h && w && age
+      ? (getChipVal('genderSelect') === 'mężczyzna'
+          ? (10*w)+(6.25*h)-(5*age)+5
+          : (10*w)+(6.25*h)-(5*age)-161)
+      : 0;
+    if (bmr > 0 && reczne < bmr * 0.8)
+      alerty.push('⚠️ Wpisane ' + reczne + ' kcal jest poniżej Twojego BMR (' + Math.round(bmr) + ' kcal) — może spowalniać metabolizm');
+    if (goal === 'redukcja wagi' && reczne > 3500)
+      alerty.push('⚠️ ' + reczne + ' kcal przy celu redukcji — sprawdź czy wartość jest prawidłowa');
+    if (goal === 'redukcja wagi' && reczne < 1200)
+      alerty.push('⚠️ ' + reczne + ' kcal to bardzo mało — minimalne bezpieczne spożycie wynosi 1200 kcal dla kobiet i 1500 kcal dla mężczyzn');
+  }
+
+  // Dieta vs tryb kliniczny
+  const disease = getChipVal('diseaseChips') || '';
+  if (disease === 'celiakia' && (diet === 'tradycyjna'))
+    alerty.push('💡 Przy celiakii rozważ dietę wegańską lub śródziemnomorską — łatwiej zbilansować bez glutenu');
+
+  // Wyświetl lub ukryj alerty
+  let alertBox = document.getElementById('formWalidacjaBox');
+  if (!alertBox) {
+    alertBox = document.createElement('div');
+    alertBox.id = 'formWalidacjaBox';
+    const genBtn = document.getElementById('genBtn');
+    genBtn?.parentNode?.insertBefore(alertBox, genBtn);
+  }
+
+  if (alerty.length > 0) {
+    alertBox.style.cssText = 'background:rgba(251,146,60,0.08);border:1px solid rgba(251,146,60,0.25);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:10px;font-size:11px;line-height:1.8;color:#fdba74;';
+    alertBox.innerHTML = alerty.join('<br>');
+  } else {
+    alertBox.style.display = 'none';
+    alertBox.innerHTML = '';
+    return;
+  }
+  alertBox.style.display = 'block';
+}
+
+function aktualizujPodgladKcal() {
+  const el = document.getElementById('reczneKcal');
+  const podglad = document.getElementById('kcalPodglad');
+  const val = parseFloat(el?.value);
+
+  if (!val || val < 500 || val > 5000) {
+    // Pokaż co wyliczy Mifflin jeśli dane są wpisane
+    const age = parseFloat(document.getElementById('age')?.value);
+    const h   = parseFloat(document.getElementById('height')?.value);
+    const w   = parseFloat(document.getElementById('weight')?.value);
+    const gender = document.getElementById('gender')?.value;
+    const activity = getChipVal('activityChips') || 'umiarkowanie aktywny';
+    const goal = getChipVal('goalChips') || 'utrzymanie wagi';
+
+    if (age && h && w) {
+      const bmr = gender === 'kobieta'
+        ? (10*w)+(6.25*h)-(5*age)-161
+        : (10*w)+(6.25*h)-(5*age)+5;
+      const palMap = {'sedentarny':1.2,'lekko aktywny':1.375,'umiarkowanie aktywny':1.55,'bardzo aktywny':1.725};
+      const tdee = Math.round(bmr * (palMap[activity]||1.55));
+      const korMap = {'redukcja wagi':-500,'utrzymanie wagi':0,'przyrost masy':300};
+      const cel = Math.max(1200, tdee + (korMap[goal]||0));
+      podglad.innerHTML = `<span style="color:var(--accent2)">🔢 Mifflin wyliczy: <strong>${cel} kcal</strong></span> (BMR ${Math.round(bmr)} · TDEE ${tdee})`;
+    } else {
+      podglad.textContent = 'Uzupełnij dane osobowe — obliczę automatycznie';
+    }
+    return;
+  }
+
+  // Ręczna wartość wpisana
+  const kategoria = val < 1200 ? '⚠️ Bardzo niska — ryzyko niedoborów'
+    : val < 1500 ? '🟡 Niska — dieta redukcyjna'
+    : val < 2000 ? '✅ Prawidłowa dla kobiet'
+    : val < 2500 ? '✅ Prawidłowa — umiarkowana aktywność'
+    : val < 3000 ? '✅ Wysoka — duża aktywność'
+    : '⚠️ Bardzo wysoka — sprawdź czy prawidłowa';
+
+  podglad.innerHTML = `<span style="color:var(--green)">✏️ Ręczna wartość: <strong>${val} kcal</strong></span> — ${kategoria}`;
+}
+
+function wyczyścReczneKcal() {
+  const el = document.getElementById('reczneKcal');
+  if (el) { el.value = ''; aktualizujPodgladKcal(); }
+}
+
+// Aktualizuj podgląd gdy zmieniają się dane osobowe
+function obliczBMI() {
+  const h = parseFloat(document.getElementById('height').value);
+  const w = parseFloat(document.getElementById('weight').value);
+  const card = document.getElementById('bmiCard');
+  if (!h || !w || h < 100 || w < 20) { card.style.display = 'none'; return; }
+
+  const bmi = w / ((h / 100) ** 2);
+  const bmiRound = Math.round(bmi * 10) / 10;
+
+  // Kategoria i kolor
+  let kat, kolor, opis;
+  if (bmi < 16)       { kat = 'Wygłodzenie';      kolor = '#60a5fa'; opis = 'Bardzo poważny niedobór masy ciała. Pilna konsultacja lekarska.'; }
+  else if (bmi < 17)  { kat = 'Wychudzenie';       kolor = '#60a5fa'; opis = 'Znaczny niedobór masy ciała. Zalecana konsultacja z dietetykiem.'; }
+  else if (bmi < 18.5){ kat = 'Niedowaga';         kolor = '#93c5fd'; opis = 'Niedobór masy ciała. Warto zadbać o odpowiednio kaloryczną dietę.'; }
+  else if (bmi < 25)  { kat = 'Norma ✅';          kolor = '#34d399'; opis = 'Prawidłowa masa ciała. Utrzymuj zdrowe nawyki żywieniowe i aktywność fizyczną.'; }
+  else if (bmi < 30)  { kat = 'Nadwaga';           kolor = '#fb923c'; opis = 'Nadwaga. Wskazana zmiana diety i zwiększenie aktywności fizycznej.'; }
+  else if (bmi < 35)  { kat = 'Otyłość I°';        kolor = '#f87171'; opis = 'Otyłość I stopnia. Zalecana konsultacja z lekarzem i dietetykiem.'; }
+  else if (bmi < 40)  { kat = 'Otyłość II°';       kolor = '#ef4444'; opis = 'Otyłość II stopnia. Wskazana opieka medyczna i dietetyczna.'; }
+  else                { kat = 'Otyłość III°';      kolor = '#dc2626'; opis = 'Otyłość III stopnia (olbrzymia). Konieczna opieka medyczna.'; }
+
+  // Aktualizuj UI
+  document.getElementById('bmiWartosc').textContent = bmiRound;
+  document.getElementById('bmiWartosc').style.color = kolor;
+
+  const badge = document.getElementById('bmiKategoriaBadge');
+  badge.textContent = kat;
+  badge.style.background = kolor + '22';
+  badge.style.color = kolor;
+
+  document.getElementById('bmiOpis').textContent = opis;
+
+  // Pozycja wskaźnika na pasku (zakres 16-40 BMI)
+  const pct = Math.min(Math.max((bmi - 16) / (40 - 16) * 100, 0), 100);
+  document.getElementById('bmiWskaznik').style.left = pct + '%';
+
+  card.style.display = 'block';
+
+  // Odśwież podgląd kcal gdy zmieniają się dane
+  aktualizujPodgladKcal();
+  // Walidacja miękka
+  walidujFormularz();
+}
+
 function showToast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg;
@@ -1153,7 +1390,7 @@ const loaderMessages = [
 ];
 
 async function generate() {
-  if (!apiKey) { openKeyModal(); showToast('⚠️ Wpisz najpierw klucz API'); return; }
+  if (!apiKey && !BACKEND_URL) { openKeyModal(); showToast('⚠️ Wpisz klucz API lub skontaktuj się z administratorem'); return; }
 
   const age = document.getElementById('age').value;
   const gender = document.getElementById('gender').value;
@@ -1167,6 +1404,7 @@ async function generate() {
   const meals = getChipVal('mealsChips');
   const days = getChipVal('daysChips');
   const allergies = document.getElementById('allergies').value;
+  const wytyczneKliniczne = document.getElementById('wytyczneKliniczne').value.trim();
   const mode = getChipVal('modeChips') || 'standard';
   const disease = getChipVal('diseaseChips') || '';
 
@@ -1184,28 +1422,57 @@ async function generate() {
     }
   }, 2000);
 
-  async function callGemini(prompt) {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 8192,
-          responseMimeType: 'application/json',
-          thinkingConfig: { thinkingBudget: 0 }
+  // Wywołanie Gemini API z retry logic (3 próby, opóźnienie 2s)
+  async function callGemini(prompt, temperatura = 0.3) {
+    const MAX_RETRIES = 3;
+    const RETRY_DELAY = 2000;
+
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const _useBackend = !!BACKEND_URL;
+        const _endpoint = _useBackend
+          ? `${BACKEND_URL}/generate`
+          : `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+        const _body = _useBackend
+          ? JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: temperatura, maxOutputTokens: 8192, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } } })
+          : JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: temperatura, maxOutputTokens: 8192, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } } });
+        const res = await fetch(_endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: _body
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          const msg = err.error?.message || `HTTP ${res.status}`;
+          // Przy błędzie 503 (high demand) lub 429 (rate limit) — ponów próbę
+          if ((res.status === 503 || res.status === 429 || res.status === 500) && attempt < MAX_RETRIES) {
+            document.getElementById('loaderText').textContent =
+              `Serwer zajęty — próba ${attempt+1}/${MAX_RETRIES}...`;
+            await new Promise(r => setTimeout(r, RETRY_DELAY * attempt));
+            continue;
+          }
+          throw new Error(msg);
         }
-      })
-    });
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error?.message || 'Błąd API');
+
+        const data = await res.json();
+        let text = data.candidates[0]?.content?.parts[0]?.text || '';
+        text = text.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+        if (!text) throw new Error('Pusta odpowiedź API');
+        return JSON.parse(text);
+
+      } catch(e) {
+        if (attempt === MAX_RETRIES) throw e;
+        // Błąd sieciowy — ponów próbę
+        if (e.name === 'TypeError' || e.message.includes('fetch')) {
+          document.getElementById('loaderText').textContent =
+            `Błąd sieci — próba ${attempt+1}/${MAX_RETRIES}...`;
+          await new Promise(r => setTimeout(r, RETRY_DELAY * attempt));
+          continue;
+        }
+        throw e;
+      }
     }
-    const data = await res.json();
-    let text = data.candidates[0]?.content?.parts[0]?.text || '';
-    text = text.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
-    return JSON.parse(text);
   }
 
   try {
@@ -1241,37 +1508,340 @@ Zasady bezwzględne:
 - Posiłki: surówki, sałatki, zupy warzywne bez soli, smoothie warzywno-owocowe, warzywa gotowane na parze
 - Wskazówki muszą zawierać informację o konieczności konsultacji z lekarzem` : '';
 
-    const specjalneNormy = mode === 'ciaza' ? ' Dzienna norma kaloryczna +300 kcal powyżej standardu.' :
-                           mode === 'laktacja' ? ' Dzienna norma kaloryczna +500 kcal powyżej standardu.' :
-                           diet === 'dabrowska' ? ' Kaloryczność 500-800 kcal/dzień (post leczniczy).' : '';
+    // ============================================================
+    // OBLICZANIE ZAPOTRZEBOWANIA KALORYCZNEGO — Mifflin-St Jeor
+    // ============================================================
+    const ageN    = parseFloat(age);
+    const heightN = parseFloat(height);
+    const weightN = parseFloat(weight);
+
+    // BMR — podstawowa przemiana materii
+    const bmr = gender === 'kobieta'
+      ? (10 * weightN) + (6.25 * heightN) - (5 * ageN) - 161
+      : (10 * weightN) + (6.25 * heightN) - (5 * ageN) + 5;
+
+    // Współczynnik aktywności PAL
+    const palMap = {
+      'sedentarny':           1.2,
+      'lekko aktywny':        1.375,
+      'umiarkowanie aktywny': 1.55,
+      'bardzo aktywny':       1.725,
+    };
+    const pal = palMap[activity] || 1.55;
+    const tdee = Math.round(bmr * pal);
+
+    // Korekta celu — deficyt zależny od BMI dla redukcji
+    const bmi = weightN / ((heightN / 100) ** 2);
+
+    let deficytRedukcji = -500; // domyślny (nadwaga i norma)
+    if (goal === 'redukcja wagi' && mode !== 'kliniczny') {
+      // Tryb kliniczny zawsze max -500 (bezpieczeństwo metaboliczne)
+      if      (bmi >= 40) deficytRedukcji = -1000; // Otyłość III°
+      else if (bmi >= 30) deficytRedukcji = -750;  // Otyłość I° i II°
+      else                deficytRedukcji = -500;  // Nadwaga i norma
+    }
+
+    const korektaMap = {
+      'redukcja wagi':  deficytRedukcji,
+      'utrzymanie wagi': 0,
+      'przyrost masy':  +300,
+    };
+    const korekta = korektaMap[goal] || 0;
+    let doceloweKcal = tdee + korekta;
+
+    // Korekta trybu specjalnego
+    if (mode === 'ciaza')    doceloweKcal = tdee + 300;
+    if (mode === 'laktacja') doceloweKcal = tdee + 500;
+    if (diet === 'dabrowska') doceloweKcal = 650;
+
+    // Minimalne kcal dla bezpieczeństwa
+    if (diet !== 'dabrowska') {
+      const minKcal = gender === 'kobieta' ? 1200 : 1500;
+      doceloweKcal = Math.max(doceloweKcal, minKcal);
+    }
+
+    // Ręczne nadpisanie — priorytet nad obliczeniami Mifflin
+    const reczneKcalVal = parseFloat(document.getElementById('reczneKcal')?.value);
+    const uzytkoReczne = reczneKcalVal >= 500 && reczneKcalVal <= 5000 && diet !== 'dabrowska';
+    if (uzytkoReczne) {
+      doceloweKcal = Math.round(reczneKcalVal);
+    }
+
+    // Podział makroskładników wg celu
+    let bPct = 0.25, tPct = 0.30, wPct = 0.45;
+    if (goal === 'przyrost masy')  { bPct = 0.30; tPct = 0.25; wPct = 0.45; }
+    if (goal === 'redukcja wagi')  { bPct = 0.35; tPct = 0.30; wPct = 0.35; }
+    if (diet === 'ketogeniczna')   { bPct = 0.25; tPct = 0.65; wPct = 0.10; }
+    if (diet === 'dabrowska')      { bPct = 0.08; tPct = 0.05; wPct = 0.87; }
+
+    const doceloweBialko = Math.round((doceloweKcal * bPct) / 4);
+    const doceloweTluszcze = Math.round((doceloweKcal * tPct) / 9);
+    const doceloweWegl = Math.round((doceloweKcal * wPct) / 4);
+
+    // Tolerancja kaloryczna — stała (RAG trafia w ~1%, badge informacyjny)
+    // 5% dla trybu klinicznego (precyzja medyczna), 10% standard IŻŻ
+    const tolerancjaPct = mode === 'kliniczny' ? 0.05 : 0.10;
+    const tolerancja = Math.round(doceloweKcal * tolerancjaPct);
+    const kcalMin = doceloweKcal - tolerancja;
+    const kcalMax = doceloweKcal + tolerancja;
+
+    const deficytInfo = goal === 'redukcja wagi' && bmi >= 30 && mode !== 'kliniczny'
+      ? ` (zwiększony dla BMI ${Math.round(bmi*10)/10})`
+      : '';
+
+    const kalkulacjaInfo = `
+ZAPOTRZEBOWANIE KALORYCZNE (obliczone wg Mifflin-St Jeor):
+- BMR (podstawowa przemiana): ${Math.round(bmr)} kcal
+- TDEE (z aktywnością ${activity}, PAL ${pal}): ${tdee} kcal
+- Korekta celu (${goal}): ${korekta >= 0 ? '+' : ''}${korekta} kcal${deficytInfo}
+- Docelowe spożycie: ${doceloweKcal} kcal/dzień${uzytkoReczne ? ' (wartość podana ręcznie przez użytkownika)' : ''}
+- Makroskładniki: Białko ${doceloweBialko}g · Tłuszcze ${doceloweTluszcze}g · Węglowodany ${doceloweWegl}g
+
+KLUCZOWY WYMÓG KALORYCZNY:
+Każdy dzień jadłospisu MUSI zawierać między ${kcalMin} a ${kcalMax} kcal (${doceloweKcal} ±${tolerancjaPct*100}%).
+Suma kalorii wszystkich posiłków w danym dniu = ${doceloweKcal} kcal (tolerancja ±${tolerancja} kcal).
+Nie wolno przekroczyć ${kcalMax} kcal ani zejść poniżej ${kcalMin} kcal w żadnym dniu.`;
 
     // Lista produktów z bazy (dla Dąbrowskiej tylko warzywa i owoce)
     const bazaHint = diet === 'dabrowska'
       ? "marchew, brokuł, kalafior, szpinak, sałata, ogórek, pomidor, papryka czerwona, papryka żółta, cebula, kapusta biała, kapusta czerwona, sałata lodowa, rukola, jarmuż, szparagi, cukinia, bakłażan, seler naciowy, seler korzeniowy, natka pietruszki, por, rzodkiewka, grzyby pieczarki, buraki, jabłko, pomarańcza, grejpfrut, cytryna, truskawki, borówki, maliny, kiwi"
       : "pierś z kurczaka, udo z kurczaka, indyk pierś, wołowina chuda, łosoś, tuńczyk w wodzie, dorsz, makrela, jajko, mleko 2%, mleko 3.2%, mleko odtłuszczone, mleko sojowe, mleko owsiane, jogurt naturalny, jogurt grecki, skyr, ser twarogowy chudy, ser twarogowy półtłusty, ser żółty, mozzarella, feta, serek wiejski, kefir, maślanka, ryż biały, ryż brązowy, makaron pszenny, makaron pełnoziarnisty, kasza gryczana, kasza jaglana, kasza bulgur, płatki owsiane, quinoa, chleb żytni, chleb graham, tortilla pszenna, ziemniaki, bataty, marchew, brokuł, szpinak, pomidor, ogórek, papryka czerwona, cebula, czosnek, kapusta biała, sałata, kukurydza, groszek zielony, buraki, cukinia, jarmuż, szparagi, grzyby pieczarki, fasola szparagowa, brukselka, jabłko, banan, pomarańcza, truskawki, borówki, kiwi, awokado, soczewica czerwona, soczewica zielona, ciecierzyca, fasola czerwona, fasola biała, tofu, tempeh, edamame, migdały, orzechy włoskie, nasiona dyni, siemię lniane, nasiona chia, masło orzechowe, oliwa z oliwek, olej rzepakowy, miód";
 
-    const prompt = `Ułóż profesjonalny jadłospis na ${days} dni dla osoby: ${gender}, ${age} lat, ${height} cm, ${weight} kg, aktywność: ${activity}, cel: ${goal}, dieta: ${diet}, ${meals} posiłków/dzień${allergies ? ', wykluczone: '+allergies : ''}.${specjalneNormy}
-${trybOpis ? `\nWYTYCZNE KLINICZNE: ${trybOpis}\n` : ''}${dabrowskaOpis ? `\n${dabrowskaOpis}\n` : ''}
-Zasady:
-1. Każdy dzień musi być inny — nie powtarzaj tych samych posiłków
-2. Używaj DOKŁADNIE tych nazw składników (baza IŻŻ): ${bazaHint}
-3. Podaj gramaturę każdego składnika (np. "płatki owsiane 60g", "mleko 2% 200ml")
-4. Zbilansuj makroskładniki do celu i trybu osoby
-5. Uwzględnij różnorodność grup produktów w ciągu tygodnia
+    // ============================================================
+    // RAG — FAZA 1: Gemini generuje TYLKO strukturę (nazwy + proporcje)
+    // Bez gramatur, bez kcal — to liczy aplikacja z bazy IŻŻ
+    // ============================================================
+    document.getElementById('loaderText').textContent = 'Projektuję strukturę jadłospisu...';
+
+    // Podział kalorii między posiłki
+    const PODZIAL_KCAL_PORY = {
+      'Śniadanie':        0.25, 'śniadanie':        0.25,
+      'II śniadanie':     0.10, 'ii śniadanie':     0.10,
+      'Drugie śniadanie': 0.10, 'drugie śniadanie': 0.10,
+      'Obiad':            0.35, 'obiad':            0.35,
+      'Podwieczorek':     0.10, 'podwieczorek':     0.10,
+      'Kolacja':          0.20, 'kolacja':          0.20,
+    };
+
+    const promptRAG = `Zaplanuj jadłospis na ${days} dni dla osoby: ${gender}, ${age} lat, dieta: ${diet}, ${meals} posiłków/dzień${allergies ? ', wykluczone: '+allergies : ''}.
+${trybOpis ? `\nWYTYCZNE KLINICZNE: ${trybOpis}` : ''}${dabrowskaOpis ? `\n${dabrowskaOpis}` : ''}${wytyczneKliniczne ? `\nDODATKOWE WYTYCZNE: ${wytyczneKliniczne}` : ''}
+
+ZASADY:
+1. Każdy dzień INNY — nie powtarzaj posiłków
+2. Używaj WYŁĄCZNIE tych nazw składników z bazy IŻŻ: ${bazaHint}
+3. NIE podawaj gramatur ani kcal — to wyliczy aplikacja
+4. Dla każdego składnika podaj procent_kcal (jak dużo kalorii z tego składnika w posiłku, suma=100)
+5. Różnorodność produktów przez cały tydzień
+6. ZAKAZ dań złożonych — NIE używaj: bigos, pierogi, żurek, kotlet schabowy, golonka, zupa, casserole, gulasz ani żadnych innych gotowych potraw. Każdy posiłek = lista PODSTAWOWYCH składników (np. zamiast "bigos" → kapusta kiszona + wieprzowina + kiełbasa + cebula)
+${trybOpis ? '7. Bezwzględnie stosuj wytyczne kliniczne przy doborze składników.' : ''}
 
 Zwróć TYLKO JSON:
-{"kcal_dziennie":number,"bialko_g":number,"tluszcze_g":number,"weglowodany_g":number,"dni":[{"dzien":"string","posilki":[{"pora":"string","nazwa":"string","skladniki":["składnik gramatura"],"kcal":number,"bialko_g":number,"tluszcze_g":number,"weglowodany_g":number}]}],"wskazowki":["string","string","string","string","string"]}
+{"wskazowki":["string","string","string","string","string"],"dni":[{"dzien":"string","posilki":[{"pora":"string","nazwa":"string","skladniki":[{"nazwa":"nazwa z bazy IŻŻ","procent_kcal":number}]}]}]}
 
-Nazwy posiłków max 5 słów. 5 praktycznych wskazówek dopasowanych do trybu i celu osoby.${trybOpis ? ' Uwzględnij wskazówki kliniczne.' : ''}`;
+Nazwy posiłków max 5 słów. 5 wskazówek żywieniowych.`;
 
-        const json = await callGemini(prompt);
+    const strukturaJSON = await callGemini(promptRAG, 0.3);
     clearInterval(msgInterval);
 
-    document.getElementById('loaderText').textContent = 'Weryfikuję wartości odżywcze...';
+    // ============================================================
+    // RAG — FAZA 2: Aplikacja oblicza gramaturę matematycznie
+    // z bazy IŻŻ tak żeby trafić dokładnie w cel kaloryczny
+    // ============================================================
+    document.getElementById('loaderText').textContent = 'Obliczam gramatury z bazy IŻŻ...';
+
+    // Limity gramatur dla typowych produktów (min/max w gramach)
+    const LIMITY_GRAMATUR = {
+      // Tłuszcze — małe porcje
+      'oliwa z oliwek': [5,35], 'olej rzepakowy': [5,30], 'masło': [5,20],
+      'masło orzechowe': [10,40],
+      // Przyprawy/dodatki
+      'miód': [5,30], 'dżem': [15,40],
+      // Orzechy/nasiona
+      'migdały': [10,50], 'orzechy włoskie': [10,50], 'nasiona chia': [10,30],
+      'siemię lniane': [10,30], 'nasiona słonecznika': [10,40],
+      // Mięso/ryby
+      'pierś z kurczaka': [80,250], 'udo z kurczaka': [100,250],
+      'łosoś': [80,200], 'tuńczyk w wodzie': [80,200], 'dorsz': [100,250],
+      'jajko': [55,220], // 1-4 jajka
+      // Nabiał
+      'jogurt naturalny': [100,300], 'jogurt grecki': [100,250],
+      'skyr': [100,250], 'ser twarogowy chudy': [50,200],
+      'ser twarogowy półtłusty': [50,200], 'serek wiejski': [100,250],
+      'mleko 2%': [100,400], 'mleko 3.2%': [100,350], 'kefir': [150,350],
+      'ser żółty': [20,80], 'mozzarella': [30,100], 'feta': [20,80],
+      // Zboża/kasze
+      'płatki owsiane': [30,100], 'ryż biały': [50,220], 'ryż brązowy': [50,220],
+      'kasza gryczana': [40,200], 'kasza jaglana': [40,200], 'kasza bulgur': [40,200],
+      'quinoa': [40,150], 'makaron pszenny': [50,220], 'makaron pełnoziarnisty': [50,220],
+      // Pieczywo
+      'chleb graham': [30,150], 'chleb żytni': [30,150], 'tortilla pszenna': [30,80],
+      // Warzywa — duże porcje OK
+      'brokuł': [50,400], 'szpinak': [30,200], 'marchew': [50,300],
+      'pomidor': [50,300], 'ogórek': [50,300], 'papryka czerwona': [50,250],
+      'kapusta biała': [50,300], 'sałata': [20,150],
+      // Owoce
+      'jabłko': [80,250], 'banan': [60,200], 'truskawki': [50,250],
+      'borówki': [50,200], 'pomarańcza': [100,250],
+      // Strączkowe
+      'soczewica czerwona': [40,200], 'ciecierzyca': [50,250],
+      'fasola czerwona': [50,200], 'tofu': [80,250],
+      // Inne
+      'ziemniaki': [100,350], 'bataty': [100,300], 'awokado': [50,200],
+    };
+
+    function obliczGramatureRAG(skladniki, targetKcal) {
+      // Filtruj tylko składniki znane w bazie (z ochroną przed undefined)
+      const znane = (skladniki || [])
+        .filter(s => s && s.nazwa && typeof s.nazwa === 'string')
+        .map(s => ({ ...s, dane: szukajWBazie(s.nazwa) }))
+        .filter(s => s.dane && s.dane.kcal > 0);
+
+      if (znane.length === 0) return { skladniki: [], sumaKcal: 0 };
+
+      let wynik = znane.map(s => ({ ...s, gramy: 0, kcal: 0, zablokowany: false }));
+      let pozostaleKcal = targetKcal;
+
+      // Iteracyjne dopasowanie (max 3 iteracje)
+      for (let iter = 0; iter < 3; iter++) {
+        const wolne = wynik.filter(s => !s.zablokowany);
+        if (wolne.length === 0) break;
+        const totalPct = wolne.reduce((s, x) => s + (x.procent_kcal || 100/znane.length), 0);
+
+        wolne.forEach(s => {
+          const [minG, maxG] = LIMITY_GRAMATUR[s.nazwa] || [5, 500];
+          const kcalTarget = pozostaleKcal * ((s.procent_kcal || 100/znane.length) / totalPct);
+          let gramy = Math.round(kcalTarget * 100 / s.dane.kcal / 5) * 5;
+          gramy = Math.max(minG, Math.min(maxG, gramy));
+
+          const byloOgraniczone = s.zablokowany;
+          const czyLimit = (gramy <= minG || gramy >= maxG);
+          s.zablokowany = czyLimit;
+          s.gramy = gramy;
+          s.kcal = Math.round(s.dane.kcal * gramy / 100);
+        });
+
+        // Sprawdź czy jest reszta do redistrybuowania
+        const sumaZabl = wynik.filter(s=>s.zablokowany).reduce((s,x)=>s+x.kcal,0);
+        const sumaWolna = wynik.filter(s=>!s.zablokowany).reduce((s,x)=>s+x.kcal,0);
+        const reszta = targetKcal - sumaZabl - sumaWolna;
+        if (Math.abs(reszta) < 25) break;
+        pozostaleKcal = reszta + sumaWolna;
+      }
+
+      let sumaKcal = wynik.reduce((s, x) => s + x.kcal, 0);
+
+      // Jeśli po iteracjach nadal brakuje kcal → dobierz inteligentny bufor
+      const odch = targetKcal - sumaKcal;
+      if (odch > 40) {
+        // Wybierz bufor zależnie od diety i wielkości niedoboru
+        const bufory = [
+          { nazwa:'oliwa z oliwek',  maxG:35,  kcalG:8.84  },
+          { nazwa:'olej rzepakowy',  maxG:30,  kcalG:8.84  },
+          { nazwa:'masło orzechowe', maxG:40,  kcalG:5.88  },
+          { nazwa:'migdały',         maxG:50,  kcalG:5.75  },
+          { nazwa:'orzechy włoskie', maxG:50,  kcalG:6.54  },
+          { nazwa:'płatki owsiane',  maxG:60,  kcalG:3.72  },
+        ];
+        let pozostaleBuf = odch;
+        for (const buf of bufory) {
+          if (pozostaleBuf < 30) break;
+          const daneBuf = szukajWBazie(buf.nazwa);
+          if (!daneBuf) continue;
+          const gBuf = Math.min(buf.maxG, Math.max(5, Math.round(pozostaleBuf / buf.kcalG / 5) * 5));
+          const kcalBuf = Math.round(daneBuf.kcal * gBuf / 100);
+          if (kcalBuf < 20) continue;
+          wynik.push({ nazwa:buf.nazwa, gramy:gBuf, kcal:kcalBuf,
+            dane:daneBuf, zablokowany:true, procent_kcal:0 });
+          sumaKcal += kcalBuf;
+          pozostaleBuf -= kcalBuf;
+          if (pozostaleBuf < 30) break;
+        }
+      }
+
+      return {
+        skladniki: wynik.map(s => `${s.nazwa} ${s.gramy}g`),
+        sumaKcal,
+        makra: wynik.reduce((acc, s) => ({
+          b: acc.b + Math.round(s.dane.b * s.gramy / 100 * 10) / 10,
+          t: acc.t + Math.round(s.dane.t * s.gramy / 100 * 10) / 10,
+          w: acc.w + Math.round(s.dane.w * s.gramy / 100 * 10) / 10,
+        }), {b:0, t:0, w:0})
+      };
+    }
+
+    // Buduj pełny JSON jadłospisu z obliczonymi gramaturami
+    const json = { wskazowki: strukturaJSON.wskazowki || [], dni: [] };
+
+    for (const dzienStr of (strukturaJSON.dni || [])) {
+      const posilkiDnia = dzienStr.posilki || [];
+      // Normalizuj podział kcal dla tej liczby posiłków
+      const sumaUdzialow = posilkiDnia.reduce((s, p) => {
+        const por = p.pora?.toLowerCase() || '';
+        return s + (Object.entries(PODZIAL_KCAL_PORY).find(([k]) => por.includes(k.toLowerCase()))?.[1] || 0.20);
+      }, 0);
+
+      const dzienObj = { dzien: dzienStr.dzien, posilki: [] };
+
+      for (const posilek of posilkiDnia) {
+        const por = posilek.pora?.toLowerCase() || '';
+        const udzial = (Object.entries(PODZIAL_KCAL_PORY).find(([k]) => por.includes(k.toLowerCase()))?.[1] || 0.20) / sumaUdzialow;
+        const targetPosilek = Math.round(doceloweKcal * udzial);
+
+        const wynikRAG = obliczGramatureRAG(posilek.skladniki || [], targetPosilek);
+
+        dzienObj.posilki.push({
+          pora: posilek.pora,
+          nazwa: posilek.nazwa,
+          skladniki: wynikRAG.skladniki,
+          kcal: wynikRAG.sumaKcal,
+          bialko_g: wynikRAG.makra.b,
+          tluszcze_g: wynikRAG.makra.t,
+          weglowodany_g: wynikRAG.makra.w,
+          zrodlo_makr: 'baza'
+        });
+      }
+      json.dni.push(dzienObj);
+    }
+
+    // Przelicz sumy dzienne
+    const liczbaDni = json.dni.length || 1;
+    const sumy = json.dni.reduce((acc, d) => {
+      d.posilki.forEach(p => {
+        acc.kcal += p.kcal||0; acc.b += p.bialko_g||0;
+        acc.t += p.tluszcze_g||0; acc.w += p.weglowodany_g||0;
+      });
+      return acc;
+    }, {kcal:0, b:0, t:0, w:0});
+    json.kcal_dziennie    = Math.round(sumy.kcal / liczbaDni);
+    json.bialko_g         = Math.round(sumy.b / liczbaDni * 10) / 10;
+    json.tluszcze_g       = Math.round(sumy.t / liczbaDni * 10) / 10;
+    json.weglowodany_g    = Math.round(sumy.w / liczbaDni * 10) / 10;
+
+    document.getElementById('loaderText').textContent = 'Uzupełniam mikroskładniki...';
     const jsonWzbogacony = await wzbogacMakrami(json);
 
-    currentResult = { json: jsonWzbogacony, params: { age, gender, height, weight, goal, diet, days }, date: new Date().toLocaleDateString('pl') };
-    renderResult(jsonWzbogacony);
+    // Skalowanie jako bufor bezpieczeństwa (RAG powinien trafić w ±5%, ale na wszelki wypadek)
+    document.getElementById('loaderText').textContent = 'Finalna weryfikacja kaloryczna...';
+    const promptParams = {
+      gender, age, height, weight, activity, goal, diet, meals,
+      allergies, wytyczneKliniczne, mode, disease, bazaHint,
+      doceloweBialko, doceloweTluszcze, doceloweWegl,
+      kcalMin, kcalMax, trybOpis, dabrowskaOpis,
+      tolerancjaPct
+    };
+    const jsonSkalowany = await skalujPosilkiDoCelu(jsonWzbogacony, doceloweKcal, callGemini, promptParams);
+
+    currentResult = {
+      json: jsonSkalowany,
+      params: { age, gender, height, weight, goal, diet, days, mode, disease,
+                bmr: Math.round(bmr), tdee, doceloweKcal, kcalMin, kcalMax,
+                uzytkoReczne: uzytkoReczne || false,
+                bmi: Math.round(bmi*10)/10,
+                deficyt: korekta,
+                doceloweBialko, doceloweTluszcze, doceloweWegl },
+      date: new Date().toLocaleDateString('pl')
+    };
+    renderResult(jsonSkalowany);
 
   } catch(e) {
     clearInterval(msgInterval);
@@ -1282,12 +1852,55 @@ Nazwy posiłków max 5 słów. 5 praktycznych wskazówek dopasowanych do trybu i
   }
 }
 
+// ============================================================
+// BLACKLISTY KLINICZNE — deterministyczne reguły per choroba
+// Źródło: PTD, PTGE, Monash University FODMAP, wytyczne ESC
+// ============================================================
+const BLACKLISTY_KLINICZNE = {
+  'cukrzyca_t2':    ['cukier','miód','syrop','dżem','banan','winogrona','daktyle','rodzynki','biały ryż','biały chleb','płatki kukurydziane'],
+  'insulinoopornosc':['cukier','miód','syrop','dżem','banan','winogrona','daktyle','rodzynki','biały ryż','biały chleb'],
+  'hashimoto':      ['surowa kapusta','surowy brokuł','surowy kalafior','surowy jarmuż','tofu','mleko sojowe'],
+  'celiakia':       ['pszenica','żyto','owies','kasza manna','kasza bulgur','kasza pęczak','makaron pszenny','chleb pszenny','chleb graham','chleb żytni','bułka pszenna','płatki owsiane','tortilla pszenna','mąka pszenna','mąka żytnia','seitan'],
+  'ibs':            ['cebula','czosnek','por','fasola czerwona','fasola biała','soczewica','ciecierzyca','bób','jabłko','gruszka','mango','arbuz','wiśnie','jeżyny','mleko','jogurt','ser twarogowy','miód'],
+  'nadcisnienie':   ['sos sojowy','kiełbasa','szynka gotowana','boczek','wędlina'],
+  'hipercholesterolemia':['masło','ghee','boczek','kiełbasa','wędlina','wątroba'],
+  'niedoczynnosc_tarczycy':['surowa kapusta','surowy brokuł','surowy kalafior','tofu','mleko sojowe']
+};
+
+function weryfikujBlacklist(json, disease) {
+  if (!disease || !BLACKLISTY_KLINICZNE[disease]) return [];
+  const zakaz = BLACKLISTY_KLINICZNE[disease];
+  const naruszenia = new Set();
+
+  (json.dni || []).forEach(dzien => {
+    (dzien.posilki || []).forEach(posilek => {
+      (posilek.skladniki || []).forEach(s => {
+        const sn = (typeof s === 'string' ? s : s.nazwa || '').toLowerCase();
+        zakaz.forEach(z => {
+          if (sn.includes(z.toLowerCase())) naruszenia.add(z);
+        });
+      });
+    });
+  });
+  return [...naruszenia];
+}
+
+function obliczConfidenceScore(json) {
+  const totalSkladniki = (json.dni || []).reduce((sum, d) =>
+    sum + (d.posilki || []).reduce((s2, p) => s2 + (p.skladniki || []).length, 0), 0);
+  const zBazy = (json.dni || []).reduce((sum, d) =>
+    sum + (d.posilki || []).reduce((s2, p) => s2 + (p.zrodlo_makr === 'baza' ? (p.skladniki||[]).length : 0), 0), 0);
+  const pct = totalSkladniki > 0 ? Math.round(zBazy / totalSkladniki * 100) : 0;
+  return { pct, zBazy, totalSkladniki };
+}
+
 function renderResult(json) {
   const params = currentResult?.params || {};
   document.getElementById('loader').classList.remove('visible');
   const recipeMode = getChipVal('recipeChips') || 'both';
   const mode = getChipVal('modeChips') || 'standard';
   const disease = getChipVal('diseaseChips') || '';
+  const diet = params.diet || getChipVal('dietChips') || 'tradycyjna';
   const area = document.getElementById('resultArea');
   area.innerHTML = '';
 
@@ -1302,8 +1915,8 @@ function renderResult(json) {
     const warn = document.createElement('div');
     warn.className = 'clinical-warn';
     warn.innerHTML = `<strong>⚕️ Tryb kliniczny: ${diseaseNames[disease]||disease}</strong><br>
-      Jadłospis uwzględnia wytyczne dietetyczne dla tej jednostki chorobowej. 
-      Zawsze skonsultuj plan żywienia z lekarzem lub dyplomowanym dietetykiem.`;
+      Jadłospis uwzględnia ogólne wskazówki żywieniowe dla tego schorzenia.
+      <strong>Ten plan jest wyłącznie inspiracją</strong> — przy schorzeniach zawsze skonsultuj dietę z dyplomowanym dietetykiem lub lekarzem.`;
     area.appendChild(warn);
   }
   if (mode === 'ciaza') {
@@ -1336,13 +1949,54 @@ function renderResult(json) {
     area.appendChild(warn);
   }
 
+  // ============================================================
+  // BLACKLIST ALERT — deterministyczna weryfikacja składników
+  // ============================================================
+  if (mode === 'kliniczny' && disease) {
+    const naruszenia = weryfikujBlacklist(json, disease);
+    if (naruszenia.length > 0) {
+      const diseaseNames = {'cukrzyca_t2':'cukrzycy T2','insulinoopornosc':'insulinooporności','hashimoto':'Hashimoto','celiakia':'celiakii','ibs':'IBS','nadcisnienie':'nadciśnienia','hipercholesterolemia':'hipercholesterolemii','niedoczynnosc_tarczycy':'niedoczynności tarczycy'};
+      const blAlert = document.createElement('div');
+      blAlert.style.cssText = 'background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:var(--radius);padding:12px 14px;margin-bottom:12px;font-size:12px;';
+      blAlert.innerHTML = `<div style="font-weight:700;color:#f87171;margin-bottom:5px;">⚠️ Wykryto składniki do weryfikacji ze specjalistą</div>
+        <div style="color:var(--text2);line-height:1.6;">Następujące składniki mogą być nieodpowiednie przy <strong style="color:var(--text)">${diseaseNames[disease]||disease}</strong>:<br>
+        <span style="color:#fca5a5;font-weight:600">${naruszenia.join(', ')}</span></div>
+        <div style="font-size:10px;color:var(--text2);margin-top:5px;opacity:0.7;">Rozważ wymianę tych posiłków (przycisk 🔄) lub skonsultuj z dietetykiem.</div>`;
+      area.appendChild(blAlert);
+    }
+  }
+
+  // ============================================================
+  // CONFIDENCE SCORE — transparentność obliczeń
+  // ============================================================
+  const cs = obliczConfidenceScore(json);
+  const csKolor = cs.pct >= 85 ? 'var(--green)' : cs.pct >= 70 ? '#fb923c' : '#f87171';
+  const csLabel = cs.pct >= 85 ? 'Wysoka' : cs.pct >= 70 ? 'Średnia' : 'Niska';
+  const csCard = document.createElement('div');
+  csCard.style.cssText = 'background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;margin-bottom:12px;';
+  csCard.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">
+      <span style="font-size:11px;font-weight:600;color:var(--text)">📊 Dokładność danych</span>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <div style="width:70px;height:5px;background:var(--border);border-radius:3px;overflow:hidden;">
+          <div style="width:${cs.pct}%;height:100%;background:${csKolor};border-radius:3px;"></div>
+        </div>
+        <span style="font-size:11px;font-weight:700;color:${csKolor}">${cs.pct}% · ${csLabel}</span>
+      </div>
+    </div>
+    <div style="font-size:10px;color:var(--text2);line-height:1.6;">
+      ${cs.zBazy}/${cs.totalSkladniki} składników przeliczono z certyfikowanej bazy IŻŻ/USDA &nbsp;·&nbsp;
+      Algorytm: Mifflin-St Jeor &nbsp;·&nbsp; AI dobiera składniki · wartości liczone z bazy IŻŻ/USDA · plan jest inspiracją, nie zaleceniem medycznym
+    </div>`;
+  area.appendChild(csCard);
+
   // Print header (widoczny tylko przy druku)
   const printHeader = document.createElement('div');
   printHeader.className = 'print-header';
   const p = json;
   printHeader.innerHTML = `
     <h1>🥗 NutriAI — Plan Żywieniowy</h1>
-    <p>Wygenerowano: ${new Date().toLocaleDateString('pl')} &nbsp;|&nbsp; ${p.kcal_dziennie} kcal/dzień &nbsp;|&nbsp; Białko: ${p.bialko_g}g &nbsp;|&nbsp; Tłuszcze: ${p.tluszcze_g}g &nbsp;|&nbsp; Węglowodany: ${p.weglowodany_g}g</p>`;
+    <p>Wygenerowano: ${new Date().toLocaleDateString('pl')} &nbsp;|&nbsp; ${p.kcal_dziennie} kcal/dzień &nbsp;|&nbsp; Białko: ${r1(p.bialko_g)}g &nbsp;|&nbsp; Tłuszcze: ${r1(p.tluszcze_g)}g &nbsp;|&nbsp; Węglowodany: ${r1(p.weglowodany_g)}g</p>`;
   area.appendChild(printHeader);
 
   // Summary z wykresem kołowym
@@ -1358,6 +2012,13 @@ function renderResult(json) {
 
   summary.innerHTML = `
     <div class="summary-title">📊 Twoje makroskładniki / dzień</div>
+    ${params.bmr ? `
+    <div style="background:rgba(124,106,247,0.08);border:1px solid rgba(124,106,247,0.2);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:11px;color:var(--text2);line-height:1.8;">
+      ${params.uzytkoReczne
+        ? `<span style="font-weight:700;color:var(--green)">✏️ Ręczna wartość</span> &nbsp;·&nbsp; <strong style="color:var(--text)">${params.doceloweKcal} kcal/dzień</strong> &nbsp;·&nbsp; BMR: ${params.bmr} kcal &nbsp;·&nbsp; TDEE: ${params.tdee} kcal`
+        : `<span style="font-weight:700;color:var(--accent2)">🔢 Mifflin-St Jeor</span> &nbsp;·&nbsp; BMR: <strong style="color:var(--text)">${params.bmr} kcal</strong> &nbsp;·&nbsp; TDEE: <strong style="color:var(--text)">${params.tdee} kcal</strong> &nbsp;·&nbsp; Cel: <strong style="color:var(--green)">${params.doceloweKcal} kcal</strong>${params.deficyt && params.deficyt < -500 ? ` &nbsp;<span style="font-size:10px;padding:2px 7px;border-radius:8px;background:rgba(251,146,60,0.15);color:#fb923c;font-weight:600">deficyt ${params.deficyt} kcal (BMI ${params.bmi})</span>` : ''}`
+      }
+    </div>` : ''}
     <div class="summary-grid">
       <div class="summary-stat"><div class="summary-val">${json.kcal_dziennie}</div><div class="summary-lbl">kcal</div></div>
       <div class="summary-stat"><div class="summary-val">${b}g</div><div class="summary-lbl">Białko</div></div>
@@ -1457,7 +2118,7 @@ function renderResult(json) {
     <button class="action-btn primary" onclick="saveCurrentResult()">💾 Zapisz</button>
     <button class="action-btn" onclick="shareResult()">📤 Udostępnij</button>
     <button class="action-btn" onclick="exportToFile()" style="flex:0;padding:13px 14px;" title="Zapisz HTML">📄</button>
-    <button class="action-btn" onclick="exportToPDF()" style="flex:0;padding:13px 14px;" title="Eksportuj PDF">📑</button>`;
+    <button class="action-btn" onclick="ocenJadlospisAI(this)" style="flex:0;padding:13px 14px;" title="Ocena AI">🧠</button>`;
   area.appendChild(actions);
 
   // Days
@@ -1465,10 +2126,16 @@ function renderResult(json) {
     const card = document.createElement('div');
     card.className = 'day-card';
     const totalKcal = day.posilki.reduce((s,m) => s+(m.kcal||0), 0);
+    const kcalMinP = params.kcalMin || 0;
+    const kcalMaxP = params.kcalMax || 99999;
+    const kcalOK = kcalMinP === 0 || (totalKcal >= kcalMinP && totalKcal <= kcalMaxP);
+    const kcalBadge = params.doceloweKcal
+      ? `<span style="font-size:10px;padding:2px 8px;border-radius:10px;margin-left:6px;font-weight:600;background:${kcalOK?'rgba(52,211,153,0.2)':'rgba(251,146,60,0.2)'};color:${kcalOK?'#34d399':'#fb923c'}">${kcalOK?'✓':'⚠'} ${totalKcal} kcal</span>`
+      : `<span class="day-kcal">${totalKcal} kcal</span>`;
 
     const header = document.createElement('div');
     header.className = 'day-header';
-    header.innerHTML = `<div><div class="day-name">${day.dzien}</div><div class="day-kcal">${totalKcal} kcal</div></div><span class="day-chevron">▼</span>`;
+    header.innerHTML = `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px"><div class="day-name">${day.dzien}</div>${kcalBadge}</div><span class="day-chevron">▼</span>`;
     header.onclick = () => card.classList.toggle('open');
     card.appendChild(header);
 
@@ -1487,12 +2154,19 @@ function renderResult(json) {
         html += `</div>`;
       }
       if (m.opis) html += `<div class="meal-desc">${m.opis}</div>`;
+      const pctDnia = params.doceloweKcal > 0
+        ? Math.round((m.kcal || 0) / params.doceloweKcal * 100)
+        : 0;
+      const pctBadge = pctDnia > 0
+        ? `<span style="font-size:10px;color:var(--text2);margin-left:4px;opacity:0.7">${pctDnia}% dnia</span>`
+        : '';
+
       html += `<div class="meal-macros">
-        <span class="macro">${m.kcal} kcal</span>
-        <span class="macro p">B: ${m.bialko_g}g</span>
-        <span class="macro f">T: ${m.tluszcze_g}g</span>
-        <span class="macro">W: ${m.weglowodany_g}g</span>
-        ${m.blonnik_g ? `<span class="macro" style="background:rgba(52,211,153,0.08);color:#6ee7b7">Błon: ${m.blonnik_g}g</span>` : ''}
+        <span class="macro">${m.kcal} kcal${pctBadge}</span>
+        <span class="macro p">B: ${r1(m.bialko_g)}g</span>
+        <span class="macro f">T: ${r1(m.tluszcze_g)}g</span>
+        <span class="macro">W: ${r1(m.weglowodany_g)}g</span>
+        ${m.blonnik_g ? `<span class="macro" style="background:rgba(52,211,153,0.08);color:#6ee7b7">Błon: ${r1(m.blonnik_g)}g</span>` : ''}
         ${m.zrodlo_makr === 'baza' ? `<span class="macro" style="background:rgba(52,211,153,0.05);color:#6ee7b7;font-size:9px">✓ IŻŻ/USDA</span>` : `<span class="macro" style="font-size:9px;opacity:0.5">~AI</span>`}
       </div>`;
 
@@ -1518,6 +2192,19 @@ function renderResult(json) {
       swapBtn.title = 'Wygeneruj inny posiłek o tych samych makrach';
       swapBtn.onclick = () => wymienPosilek(m, day, swapBtn, meal, json, params);
       meal.appendChild(swapBtn);
+
+      // Przyciski przelicznika porcji
+      const porcjeRow = document.createElement('div');
+      porcjeRow.style.cssText = 'display:flex;gap:5px;margin-top:5px;align-items:center;';
+      porcjeRow.innerHTML = `
+        <span style="font-size:10px;color:var(--text2);margin-right:2px;">Porcja:</span>
+        <button onclick="przeliczPorcje('${m.nazwa?.replace(/'/g,"\\'")||""}',${i},${day.posilki.indexOf(m)},0.5)"
+          style="font-size:10px;padding:3px 8px;background:rgba(124,106,247,0.1);border:1px solid rgba(124,106,247,0.2);border-radius:12px;color:var(--accent2);cursor:pointer;">÷2</button>
+        <button onclick="przeliczPorcje('${m.nazwa?.replace(/'/g,"\\'")||""}',${i},${day.posilki.indexOf(m)},2)"
+          style="font-size:10px;padding:3px 8px;background:rgba(124,106,247,0.1);border:1px solid rgba(124,106,247,0.2);border-radius:12px;color:var(--accent2);cursor:pointer;">×2</button>
+        <button onclick="przeliczPorcje('${m.nazwa?.replace(/'/g,"\\'")||""}',${i},${day.posilki.indexOf(m)},1.5)"
+          style="font-size:10px;padding:3px 8px;background:rgba(124,106,247,0.1);border:1px solid rgba(124,106,247,0.2);border-radius:12px;color:var(--accent2);cursor:pointer;">×1.5</button>`;
+      meal.appendChild(porcjeRow);
 
       body.appendChild(meal);
     });
@@ -1610,9 +2297,9 @@ function exportToFile() {
           ${skladnikiHtml ? `<div class="ingredients">${skladnikiHtml}</div>` : ''}
           <div class="macros">
             <span>${m.kcal} kcal</span>
-            <span class="p">B: ${m.bialko_g}g</span>
-            <span class="f">T: ${m.tluszcze_g}g</span>
-            <span>W: ${m.weglowodany_g}g</span>
+            <span class="p">B: ${r1(m.bialko_g)}g</span>
+            <span class="f">T: ${r1(m.tluszcze_g)}g</span>
+            <span>W: ${r1(m.weglowodany_g)}g</span>
           </div>
         </div>`;
     }).join('');
@@ -1625,6 +2312,14 @@ function exportToFile() {
         <div class="day-body">${posilkiHtml}</div>
       </div>`;
   }).join('');
+
+  const aiOcenaHtml = currentResult.aiOcena
+    ? `<div class="ai-ocena">
+        <h3>🧠 Ocena dietetyczna AI</h3>
+        <div class="ai-text">${currentResult.aiOcena.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')}</div>
+        <div class="ai-disclaimer">Opinia wygenerowana przez Gemini · Nie zastępuje porady dietetyka</div>
+       </div>`
+    : '';
 
   const wskazowkiHtml = (j.wskazowki||[]).map(w => `<div class="tip">💡 ${w}</div>`).join('');
 
@@ -1665,6 +2360,10 @@ function exportToFile() {
 <title>NutriAI — Jadłospis ${date}</title>
 <style>
   body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; color: #222; background: #fff; }
+  .print-bar { background: #f0eeff; border: 1px solid #c4b5fd; border-radius: 10px; padding: 12px 16px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .print-bar span { font-size: 13px; color: #5b4dd4; }
+  .print-btn { background: #7c6af7; color: #fff; border: none; border-radius: 8px; padding: 9px 18px; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .print-btn:hover { background: #5b4dd4; }
   .header { text-align: center; border-bottom: 3px solid #7c6af7; padding-bottom: 16px; margin-bottom: 24px; }
   .header h1 { color: #7c6af7; margin: 0 0 6px; font-size: 26px; }
   .header p { color: #666; font-size: 13px; margin: 0; }
@@ -1691,29 +2390,43 @@ function exportToFile() {
   .macros span { font-size: 11px; padding: 2px 8px; border-radius: 20px; background: #f0eeff; color: #7c6af7; }
   .macros span.p { background: #e8faf3; color: #1a7a52; }
   .macros span.f { background: #fff3eb; color: #b45309; }
+  .ai-ocena { background: linear-gradient(135deg,#f5f3ff,#f0fdf4); border: 1px solid #c4b5fd; border-radius: 10px; padding: 16px; margin-bottom: 20px; }
+  .ai-ocena h3 { color: #7c6af7; font-size: 14px; margin-bottom: 10px; }
+  .ai-text { font-size: 12px; color: #333; line-height: 1.8; }
+  .ai-disclaimer { font-size: 10px; color: #aaa; margin-top: 8px; }
   .tips { margin-top: 24px; }
   .tips h3 { color: #7c6af7; margin-bottom: 10px; }
   .tip { background: #fafafa; border: 1px solid #e0e0e0; border-radius: 8px; padding: 10px 14px; margin-bottom: 8px; font-size: 13px; color: #555; }
   .footer { text-align: center; margin-top: 32px; padding-top: 16px; border-top: 1px solid #eee; font-size: 11px; color: #aaa; }
-  @media print { body { padding: 10px; } .day { page-break-inside: avoid; } }
+  @media print {
+    .print-bar { display: none; }
+    body { padding: 10px; }
+    .day { page-break-inside: avoid; }
+    @page { margin: 15mm; size: A4; }
+  }
 </style>
 </head>
 <body>
+  <div class="print-bar">
+    <span>📋 Aby zapisać jako PDF: kliknij Drukuj → wybierz "Zapisz jako PDF"</span>
+    <button class="print-btn" onclick="window.print()">🖨️ Drukuj / Zapisz PDF</button>
+  </div>
   <div class="header">
     <h1>🥗 NutriAI — Plan Żywieniowy</h1>
     <p>Wygenerowano: ${date} &nbsp;|&nbsp; Cel: ${params.goal} &nbsp;|&nbsp; Dieta: ${params.diet} &nbsp;|&nbsp; ${params.days} dni &nbsp;|&nbsp; ${params.gender}, ${params.age} lat</p>
   </div>
   <div class="summary">
     <div class="stat"><div class="stat-val">${j.kcal_dziennie}</div><div class="stat-lbl">kcal / dzień</div></div>
-    <div class="stat"><div class="stat-val">${j.bialko_g}g</div><div class="stat-lbl">Białko</div></div>
-    <div class="stat"><div class="stat-val">${j.tluszcze_g}g</div><div class="stat-lbl">Tłuszcze</div></div>
-    <div class="stat"><div class="stat-val">${j.weglowodany_g}g</div><div class="stat-lbl">Węglowodany</div></div>
+    <div class="stat"><div class="stat-val">${r1(j.bialko_g)}g</div><div class="stat-lbl">Białko</div></div>
+    <div class="stat"><div class="stat-val">${r1(j.tluszcze_g)}g</div><div class="stat-lbl">Tłuszcze</div></div>
+    <div class="stat"><div class="stat-val">${r1(j.weglowodany_g)}g</div><div class="stat-lbl">Węglowodany</div></div>
   </div>
   ${m.wapn_mg !== undefined ? `
   <div class="mikro-section">
     <h3>🔬 Analiza mikroskładników (średnia dzienna · normy IŻŻ)</h3>
     <table class="mikro-table">${mikroHtml}</table>
   </div>` : ''}
+  ${aiOcenaHtml}
   ${dniHtml}
   ${wskazowkiHtml ? `<div class="tips"><h3>Wskazówki żywieniowe</h3>${wskazowkiHtml}</div>` : ''}
   <div class="footer">Wygenerowano przez NutriAI &nbsp;·&nbsp; Źródło danych: IŻŻ / USDA FoodData Central &nbsp;·&nbsp; ko-fi.com/b4stek</div>
@@ -1852,7 +2565,8 @@ function loadDiary() {
   const entries = JSON.parse(localStorage.getItem('diary_entries') || '[]');
   const list = document.getElementById('diaryList');
   const empty = document.getElementById('emptyDiary');
-  if (!entries.length) { list.innerHTML = ''; empty.style.display = 'flex'; return; }
+  if (!entries.length) { list.innerHTML = ''; empty.style.display = 'flex';
+    document.getElementById('diaryTrendCard').style.display = 'none'; return; }
   empty.style.display = 'none';
 
   // Grupuj po dacie
@@ -1862,14 +2576,32 @@ function loadDiary() {
     byDate[e.date].push(e);
   });
 
+  // Pobierz cel kaloryczny z ostatniego wygenerowanego jadłospisu
+  const celKcal = currentResult?.params?.doceloweKcal || 0;
+
+  // Renderuj wykres trendu jeśli ≥2 dni
+  const dniDates = Object.keys(byDate).sort((a,b) => {
+    const pa = a.split('.').reverse().join('-');
+    const pb = b.split('.').reverse().join('-');
+    return new Date(pa) - new Date(pb);
+  });
+
+  if (dniDates.length >= 2) {
+    renderDiaryTrend(byDate, dniDates, celKcal);
+  } else {
+    document.getElementById('diaryTrendCard').style.display = 'none';
+  }
+
   list.innerHTML = Object.entries(byDate).reverse().map(([date, dayEntries]) => {
     const totalKcal = dayEntries.reduce((s,e) => s+(e.kcal||0), 0);
     const totalB = dayEntries.reduce((s,e) => s+(e.bialko||0), 0);
     const totalT = dayEntries.reduce((s,e) => s+(e.tluszcze||0), 0);
     const totalW = dayEntries.reduce((s,e) => s+(e.wegl||0), 0);
+    const celBadge = celKcal > 0
+      ? `<span style="font-size:10px;margin-left:6px;padding:2px 7px;border-radius:10px;font-weight:600;background:${Math.abs(totalKcal-celKcal)/celKcal<=0.10?'rgba(52,211,153,0.15)':'rgba(251,146,60,0.15)'};color:${Math.abs(totalKcal-celKcal)/celKcal<=0.10?'var(--green)':'var(--orange)'}">${Math.abs(totalKcal-celKcal)/celKcal<=0.10?'✓':'!'} ${Math.round(Math.abs(totalKcal-celKcal)/celKcal*100)}% od celu</span>` : '';
     return `
       <div class="diary-day">
-        <div class="diary-date">${date}</div>
+        <div class="diary-date" style="display:flex;align-items:center;">${date}${celBadge}</div>
         <div class="diary-macros" style="margin-bottom:10px">
           <span class="macro">${totalKcal} kcal</span>
           <span class="macro p">B: ${Math.round(totalB*10)/10}g</span>
@@ -1883,6 +2615,105 @@ function loadDiary() {
           </div>`).join('')}
       </div>`;
   }).join('');
+}
+
+function renderDiaryTrend(byDate, dniDates, celKcal) {
+  const card = document.getElementById('diaryTrendCard');
+  const canvas = document.getElementById('diaryTrendChart');
+  const statsEl = document.getElementById('diaryTrendStats');
+  card.style.display = 'block';
+
+  // Ostatnie 14 dni
+  const ostatnie = dniDates.slice(-14);
+  const wartosci = ostatnie.map(d =>
+    (byDate[d]||[]).reduce((s,e) => s+(e.kcal||0), 0)
+  );
+  const etykiety = ostatnie.map(d => d.split('.').slice(0,2).join('.'));
+
+  const W = canvas.offsetWidth || 300;
+  const H = 80;
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+
+  const maxV = Math.max(...wartosci, celKcal * 1.2) * 1.05;
+  const minV = Math.min(...wartosci.filter(v=>v>0), celKcal * 0.8) * 0.95;
+  const zakres = maxV - minV || 1;
+
+  const px = (i) => (i / (ostatnie.length - 1)) * (W - 20) + 10;
+  const py = (v) => H - 8 - ((v - minV) / zakres) * (H - 16);
+
+  // Linia celu
+  if (celKcal > 0) {
+    const cy = py(celKcal);
+    ctx.beginPath();
+    ctx.setLineDash([4,3]);
+    ctx.strokeStyle = '#34d399';
+    ctx.lineWidth = 1.5;
+    ctx.moveTo(0, cy);
+    ctx.lineTo(W, cy);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Wypełnienie pod krzywą
+  ctx.beginPath();
+  wartosci.forEach((v,i) => { if(v>0) i===0 ? ctx.moveTo(px(i),py(v)) : ctx.lineTo(px(i),py(v)); });
+  ctx.lineTo(px(wartosci.length-1), H);
+  ctx.lineTo(px(0), H);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(124,106,247,0.12)';
+  ctx.fill();
+
+  // Linia danych
+  ctx.beginPath();
+  let pierwszy = true;
+  wartosci.forEach((v,i) => {
+    if (v <= 0) return;
+    if (pierwszy) { ctx.moveTo(px(i),py(v)); pierwszy=false; }
+    else ctx.lineTo(px(i),py(v));
+  });
+  ctx.strokeStyle = '#a78bfa';
+  ctx.lineWidth = 2;
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+
+  // Punkty
+  wartosci.forEach((v,i) => {
+    if (v <= 0) return;
+    ctx.beginPath();
+    ctx.arc(px(i), py(v), 3, 0, Math.PI*2);
+    const ok = celKcal > 0 && Math.abs(v-celKcal)/celKcal <= 0.10;
+    ctx.fillStyle = ok ? '#34d399' : '#a78bfa';
+    ctx.fill();
+  });
+
+  // Etykiety osi X (co 2-3 dni)
+  ctx.fillStyle = '#9898b8';
+  ctx.font = '8px sans-serif';
+  ctx.textAlign = 'center';
+  const step = Math.max(1, Math.floor(ostatnie.length / 5));
+  ostatnie.forEach((d,i) => {
+    if (i % step === 0 || i === ostatnie.length-1) {
+      ctx.fillText(etykiety[i], px(i), H);
+    }
+  });
+
+  // Statystyki pod wykresem
+  const niepuste = wartosci.filter(v => v > 0);
+  const avg = Math.round(niepuste.reduce((s,v)=>s+v,0) / (niepuste.length||1));
+  const wDnormy = celKcal > 0
+    ? niepuste.filter(v => Math.abs(v-celKcal)/celKcal <= 0.10).length
+    : 0;
+  const trend = niepuste.length >= 2
+    ? (niepuste[niepuste.length-1] - niepuste[0] > 0 ? '📈 Rośnie' : '📉 Spada')
+    : '—';
+
+  statsEl.innerHTML = `
+    <div><div style="font-size:16px;font-weight:700;color:var(--accent2)">${avg}</div><div style="font-size:10px;color:var(--text2)">Śr. kcal/dzień</div></div>
+    <div><div style="font-size:16px;font-weight:700;color:var(--green)">${wDnormy}/${niepuste.length}</div><div style="font-size:10px;color:var(--text2)">Dni w normie</div></div>
+    <div><div style="font-size:14px;font-weight:700;color:var(--text)">${trend}</div><div style="font-size:10px;color:var(--text2)">Tendencja</div></div>`;
 }
 
 function addDiaryEntry() {
@@ -1935,228 +2766,12 @@ function saveDiaryEntry(date) {
   showToast('✅ Dodano do dziennika!');
 }
 
-// ============================================================
-// EKSPORT PDF — profesjonalny raport
-// ============================================================
-async function exportToPDF() {
-  if (!currentResult) return;
-  showToast('⏳ Generuję PDF...');
-
-  // Ładujemy jsPDF z CDN
-  if (!window.jspdf) {
-    await new Promise((resolve, reject) => {
-      const s = document.createElement('script');
-      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-      s.onload = resolve;
-      s.onerror = reject;
-      document.head.appendChild(s);
-    });
-  }
-
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  const j = currentResult.json;
-  const params = currentResult.params;
-  const date = currentResult.date;
-  const n = getNormy(params.gender, params.age);
-  const m = j.mikro || {};
-  const r = v => Math.round(v * 10) / 10;
-
-  // Kolory
-  const PURPLE = [124, 106, 247];
-  const GREEN  = [52, 211, 153];
-  const ORANGE = [251, 146, 60];
-  const RED    = [248, 113, 113];
-  const GRAY   = [100, 100, 120];
-  const DARK   = [30, 30, 50];
-  const LIGHT  = [245, 243, 255];
-
-  let y = 15;
-  const W = 210;
-  const M = 15; // margin
-  const CW = W - 2*M; // content width
-
-  // === NAGŁÓWEK ===
-  doc.setFillColor(...PURPLE);
-  doc.rect(0, 0, W, 28, 'F');
-  doc.setTextColor(255,255,255);
-  doc.setFontSize(18);
-  doc.setFont('helvetica','bold');
-  doc.text('NutriAI — Plan Żywieniowy', M, 12);
-  doc.setFontSize(9);
-  doc.setFont('helvetica','normal');
-  doc.text(`Wygenerowano: ${date}  |  ${params.gender}, ${params.age} lat, ${params.height}cm, ${params.weight}kg  |  Cel: ${params.goal}  |  Dieta: ${params.diet}`, M, 21);
-  doc.text(`Źródło danych: IŻŻ / USDA FoodData Central`, M, 26);
-  y = 36;
-
-  // === MAKROSKŁADNIKI SUMMARY ===
-  doc.setFillColor(...LIGHT);
-  doc.roundedRect(M, y, CW, 22, 3, 3, 'F');
-  doc.setTextColor(...DARK);
-  const makroCols = [
-    { label: 'kcal/dzień', val: j.kcal_dziennie },
-    { label: 'Białko', val: j.bialko_g + 'g' },
-    { label: 'Tłuszcze', val: j.tluszcze_g + 'g' },
-    { label: 'Węglowodany', val: j.weglowodany_g + 'g' },
-    { label: 'Błonnik', val: (j.blonnik_g||0) + 'g' },
-  ];
-  makroCols.forEach((col, i) => {
-    const x = M + (CW / makroCols.length) * i + (CW / makroCols.length) / 2;
-    doc.setFontSize(16);
-    doc.setFont('helvetica','bold');
-    doc.setTextColor(...PURPLE);
-    doc.text(String(col.val), x, y + 10, { align: 'center' });
-    doc.setFontSize(8);
-    doc.setFont('helvetica','normal');
-    doc.setTextColor(...GRAY);
-    doc.text(col.label, x, y + 17, { align: 'center' });
-  });
-  y += 28;
-
-  // === ANALIZA MIKROSKŁADNIKÓW ===
-  doc.setFontSize(11);
-  doc.setFont('helvetica','bold');
-  doc.setTextColor(...DARK);
-  doc.text('Analiza mikroskładników (średnia dzienna · normy IŻŻ)', M, y);
-  y += 6;
-
-  const mikroDane = [
-    { label:'Wapń',        war: r(m.wapn_mg||0),    norma: n.wapn,    jedn:'mg' },
-    { label:'Żelazo',      war: r(m.zelazo_mg||0),  norma: n.zelazo,  jedn:'mg' },
-    { label:'Magnez',      war: r(m.magnez_mg||0),  norma: n.magnez,  jedn:'mg' },
-    { label:'Wit. C',      war: r(m.vit_c_mg||0),   norma: n.vit_c,   jedn:'mg' },
-    { label:'Wit. D',      war: r(m.vit_d_ug||0),   norma: n.vit_d,   jedn:'µg' },
-    { label:'Wit. B12',    war: r(m.vit_b12_ug||0), norma: n.vit_b12, jedn:'µg' },
-    { label:'Kw. foliowy', war: r(m.folany_ug||0),  norma: n.fol,     jedn:'µg' },
-    { label:'Błonnik',     war: r(j.blonnik_g||0),  norma: n.blonnik, jedn:'g'  },
-    { label:'Cynk',        war: r(m.cynk_mg||0),    norma: n.cynk,    jedn:'mg' },
-  ];
-
-  // 2 kolumny
-  const colW2 = CW / 2 - 3;
-  mikroDane.forEach((d, i) => {
-    const col = i % 2;
-    const row = Math.floor(i / 2);
-    const x = M + col * (colW2 + 6);
-    const yy = y + row * 10;
-    const pct = d.norma > 0 ? Math.min((d.war / d.norma) * 100, 100) : 0;
-    const color = pct >= 100 ? GREEN : pct >= 70 ? ORANGE : RED;
-    const barW = (colW2 - 50) * (pct / 100);
-
-    doc.setFontSize(8);
-    doc.setFont('helvetica','normal');
-    doc.setTextColor(...GRAY);
-    doc.text(d.label, x, yy + 4);
-
-    // Bar background
-    doc.setFillColor(220, 218, 240);
-    doc.rect(x + 28, yy, colW2 - 50, 4, 'F');
-
-    // Bar fill
-    doc.setFillColor(...color);
-    if (barW > 0) doc.rect(x + 28, yy, barW, 4, 'F');
-
-    // Value
-    doc.setTextColor(...color);
-    doc.setFont('helvetica','bold');
-    doc.text(`${d.war}${d.jedn} (${Math.round(pct)}%)`, x + colW2 - 20, yy + 4, { align: 'right' });
-  });
-
-  y += Math.ceil(mikroDane.length / 2) * 10 + 8;
-
-  // === JADŁOSPIS DZIENNY ===
-  doc.setFontSize(11);
-  doc.setFont('helvetica','bold');
-  doc.setTextColor(...DARK);
-  doc.text('Jadłospis', M, y);
-  y += 5;
-
-  for (const dzien of (j.dni || [])) {
-    // Sprawdź czy zmieści się na stronie
-    if (y > 260) { doc.addPage(); y = 15; }
-
-    // Nagłówek dnia
-    doc.setFillColor(...PURPLE);
-    doc.roundedRect(M, y, CW, 8, 2, 2, 'F');
-    doc.setTextColor(255,255,255);
-    doc.setFontSize(9);
-    doc.setFont('helvetica','bold');
-    const totalKcal = dzien.posilki?.reduce((s,p) => s+(p.kcal||0), 0) || 0;
-    doc.text(dzien.dzien, M + 3, y + 5.5);
-    doc.text(`${totalKcal} kcal`, M + CW - 3, y + 5.5, { align: 'right' });
-    y += 11;
-
-    for (const p of (dzien.posilki || [])) {
-      if (y > 270) { doc.addPage(); y = 15; }
-
-      doc.setFillColor(248, 247, 255);
-      doc.rect(M, y, CW, 6, 'F');
-      doc.setTextColor(...PURPLE);
-      doc.setFontSize(7);
-      doc.setFont('helvetica','bold');
-      doc.text(p.pora.toUpperCase(), M + 2, y + 4);
-      doc.setTextColor(...DARK);
-      doc.text(p.nazwa || '', M + 22, y + 4);
-      doc.setTextColor(...GRAY);
-      doc.setFont('helvetica','normal');
-      doc.text(`${p.kcal||0} kcal  B:${p.bialko_g||0}g  T:${p.tluszcze_g||0}g  W:${p.weglowodany_g||0}g`, M + CW - 2, y + 4, { align: 'right' });
-      y += 6;
-
-      // Składniki
-      if (p.skladniki?.length) {
-        if (y > 270) { doc.addPage(); y = 15; }
-        doc.setTextColor(...GRAY);
-        doc.setFontSize(6.5);
-        const ingText = p.skladniki.join('  ·  ');
-        const lines = doc.splitTextToSize(ingText, CW - 4);
-        doc.text(lines, M + 2, y + 3);
-        y += lines.length * 3.5 + 1;
-      }
-      y += 1;
-    }
-    y += 4;
-  }
-
-  // === WSKAZÓWKI ===
-  if (j.wskazowki?.length) {
-    if (y > 240) { doc.addPage(); y = 15; }
-    doc.setFontSize(11);
-    doc.setFont('helvetica','bold');
-    doc.setTextColor(...DARK);
-    doc.text('Wskazówki żywieniowe', M, y);
-    y += 6;
-    j.wskazowki.forEach(w => {
-      if (y > 275) { doc.addPage(); y = 15; }
-      doc.setFontSize(8);
-      doc.setFont('helvetica','normal');
-      doc.setTextColor(...GRAY);
-      const lines = doc.splitTextToSize('• ' + w, CW);
-      doc.text(lines, M, y);
-      y += lines.length * 4 + 2;
-    });
-  }
-
-  // === STOPKA ===
-  const pageCount = doc.internal.getNumberOfPages();
-  for (let i = 1; i <= pageCount; i++) {
-    doc.setPage(i);
-    doc.setFillColor(...LIGHT);
-    doc.rect(0, 287, W, 10, 'F');
-    doc.setFontSize(7);
-    doc.setTextColor(...GRAY);
-    doc.text('NutriAI  ·  Dane: IŻŻ / USDA FoodData Central  ·  ko-fi.com/b4stek', M, 293);
-    doc.text(`Strona ${i} / ${pageCount}`, W - M, 293, { align: 'right' });
-  }
-
-  doc.save(`NutriAI-jadlospisow-${date.replace(/\./g,'-')}.pdf`);
-  showToast('📑 PDF pobrany!');
-}
 
 // ============================================================
 // WYMIEŃ POSIŁEK — zamień jeden posiłek zachowując makra
 // ============================================================
 async function wymienPosilek(posilek, dzien, btn, mealEl, json, params) {
-  if (!apiKey) { openKeyModal(); showToast('⚠️ Najpierw wpisz klucz API'); return; }
+  if (!apiKey && !BACKEND_URL) { openKeyModal(); showToast('⚠️ Najpierw wpisz klucz API'); return; }
 
   btn.disabled = true;
   btn.innerHTML = '⏳ Szukam zamiennika...';
@@ -2164,11 +2779,12 @@ async function wymienPosilek(posilek, dzien, btn, mealEl, json, params) {
 
   const diet = params?.diet || getChipVal('dietChips') || 'tradycyjna';
   const allergies = document.getElementById('allergies')?.value || '';
+  const wytyczneKliniczne = document.getElementById('wytyczneKliniczne')?.value?.trim() || '';
   const mode = getChipVal('modeChips') || 'standard';
   const disease = mode === 'kliniczny' ? (getChipVal('diseaseChips') || '') : '';
 
   const prompt = `Zaproponuj INNY posiłek zamiast "${posilek.nazwa}" na porę: ${posilek.pora}.
-Dieta: ${diet}${allergies ? ', wykluczone: '+allergies : ''}.${disease ? ' Jednostka: '+disease+'.' : ''}
+Dieta: ${diet}${allergies ? ', wykluczone produkty: '+allergies : ''}.${disease ? ' Jednostka: '+disease+'.' : ''}${wytyczneKliniczne ? '\nDodatkowe wytyczne: '+wytyczneKliniczne : ''}
 Zachowaj zbliżone makroskładniki: ~${posilek.kcal} kcal, białko ~${posilek.bialko_g}g, tłuszcze ~${posilek.tluszcze_g}g, węglowodany ~${posilek.weglowodany_g}g.
 Podaj inny posiłek niż: ${(dzien.posilki||[]).map(p=>p.nazwa).join(', ')}.
 
@@ -2177,12 +2793,12 @@ Zwróć TYLKO JSON:
 
   try {
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      BACKEND_URL ? `${BACKEND_URL}/query` : `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({
           contents:[{parts:[{text:prompt}]}],
-          generationConfig:{temperature:0.8,maxOutputTokens:1024,responseMimeType:'application/json',thinkingConfig:{thinkingBudget:0}}
+          generationConfig:{temperature:0.6,maxOutputTokens:1024,responseMimeType:'application/json',thinkingConfig:{thinkingBudget:0}}
         })
       }
     );
@@ -2214,12 +2830,19 @@ Zwróć TYLKO JSON:
       nowyPosilek.skladniki.forEach(s => { html += `<span class="ingredient">🥄 ${s}</span>`; });
       html += `</div>`;
     }
+    const pctDniaN = params.doceloweKcal > 0
+      ? Math.round((nowyPosilek.kcal || 0) / params.doceloweKcal * 100)
+      : 0;
+    const pctBadgeN = pctDniaN > 0
+      ? `<span style="font-size:10px;color:var(--text2);margin-left:4px;opacity:0.7">${pctDniaN}% dnia</span>`
+      : '';
+
     html += `<div class="meal-macros">
-      <span class="macro">${nowyPosilek.kcal} kcal</span>
-      <span class="macro p">B: ${nowyPosilek.bialko_g}g</span>
-      <span class="macro f">T: ${nowyPosilek.tluszcze_g}g</span>
-      <span class="macro">W: ${nowyPosilek.weglowodany_g}g</span>
-      ${nowyPosilek.blonnik_g ? `<span class="macro" style="background:rgba(52,211,153,0.08);color:#6ee7b7">Błon: ${nowyPosilek.blonnik_g}g</span>` : ''}
+      <span class="macro">${nowyPosilek.kcal} kcal${pctBadgeN}</span>
+      <span class="macro p">B: ${r1(nowyPosilek.bialko_g)}g</span>
+      <span class="macro f">T: ${r1(nowyPosilek.tluszcze_g)}g</span>
+      <span class="macro">W: ${r1(nowyPosilek.weglowodany_g)}g</span>
+      ${nowyPosilek.blonnik_g ? `<span class="macro" style="background:rgba(52,211,153,0.08);color:#6ee7b7">Błon: ${r1(nowyPosilek.blonnik_g)}g</span>` : ''}
       <span class="macro" style="font-size:9px;${nowyPosilek.zrodlo_makr==='baza'?'background:rgba(52,211,153,0.05);color:#6ee7b7':'opacity:0.5'}">${nowyPosilek.zrodlo_makr==='baza'?'✓ IŻŻ/USDA':'~AI'}</span>
     </div>`;
     if (recipeMode !== 'none') {
@@ -2247,6 +2870,121 @@ Zwróć TYLKO JSON:
     btn.classList.remove('swap-loading');
     showToast('❌ ' + e.message.substring(0,40));
   }
+}
+
+// ============================================================
+// PKT 6: OCENA JADŁOSPISU PRZEZ AI
+// ============================================================
+async function ocenJadlospisAI(btn) {
+  if (!currentResult) return;
+  if (!apiKey && !BACKEND_URL) { openKeyModal(); return; }
+
+  btn.disabled = true;
+  btn.textContent = '⏳';
+
+  const j = currentResult.json;
+  const params = currentResult.params || {};
+  const n = getNormy(params.gender, params.age);
+  const m = j.mikro || {};
+
+  const tluszczMin = Math.round((params.doceloweKcal||j.kcal_dziennie) * 0.25 / 9);
+  const tluszczCel = Math.round((params.doceloweKcal||j.kcal_dziennie) * 0.30 / 9);
+
+  const deficytInfo = params.deficyt && params.deficyt < 0
+    ? `Zastosowany deficyt: ${params.deficyt} kcal${params.bmi >= 30 ? ` (zwiększony dla BMI ${params.bmi})` : ''}`
+    : '';
+
+  const trybInfo = params.mode && params.mode !== 'standard'
+    ? `Tryb specjalny: ${params.mode === 'ciaza' ? 'Ciąża (TDEE+300 kcal, normy IŻŻ ciążowe)' : params.mode === 'laktacja' ? 'Laktacja (TDEE+500 kcal, normy IŻŻ laktacji)' : params.mode === 'kliniczny' ? `Specjalistyczny${params.disease ? ' — '+params.disease : ''} (do konsultacji z dietetykiem)` : params.mode}`
+    : '';
+
+  const podsumowanie = `
+Jadłospis ${j.dni?.length||0}-dniowy, ${j.kcal_dziennie} kcal/dzień
+Cel kaloryczny aplikacji: ${params.doceloweKcal||j.kcal_dziennie} kcal/dzień (${j.kcal_dziennie} kcal to PRAWIDŁOWA wartość docelowa, NIE błąd)
+BMR: ${params.bmr||'?'} kcal, TDEE: ${params.tdee||'?'} kcal${deficytInfo ? '\n'+deficytInfo : ''}${params.bmi ? `\nBMI: ${params.bmi}` : ''}${trybInfo ? `\n${trybInfo}` : ''}
+Białko: ${r1(j.bialko_g)}g (cel: ${params.doceloweBialko||'?'}g)
+Tłuszcze: ${r1(j.tluszcze_g)}g (cel: ${tluszczCel}g, minimum: ${tluszczMin}g — ${j.tluszcze_g >= tluszczMin ? 'W NORMIE' : 'PONIŻEJ MINIMUM'})
+Węglowodany: ${r1(j.weglowodany_g)}g (cel: ${params.doceloweWegl||'?'}g)
+Błonnik: ${r1(j.blonnik_g)}g (norma: ${n.blonnik}g)
+Wit. D: ${m.vit_d_ug||0}µg (norma: ${n.vit_d}µg)
+Żelazo: ${m.zelazo_mg||0}mg (norma: ${n.zelazo}mg)
+Omega-3: ${m.omega3_g||0}g
+Dieta: ${params.diet||''}, Cel: ${params.goal||''}`;
+
+  const prompt = `Jesteś doświadczonym dietetykiem klinicznym. Oceń poniższy jadłospis w 3 zwięzłych punktach po polsku:
+1. ✅ Co jest dobrze zbilansowane
+2. ⚠️ Co wymaga poprawy (konkretnie)
+3. 💡 Jedno najważniejsze zalecenie
+
+WAŻNE zasady oceny:
+- Kaloryczność jest CELOWO dopasowana do celu i trybu — NIE krytykuj jej jeśli mieści się w ±15% celu
+- Przy trybie Ciąża oceń jadłospis pod kątem potrzeb ciężarnej (kwas foliowy, żelazo, DHA, wapń)
+- Przy trybie Laktacja skup się na podaży składników wspierających laktację
+- Przy trybie Klinicznym uwzględnij ograniczenia danej jednostki chorobowej
+
+Dane jadłospisu:
+${podsumowanie}
+
+Odpowiedź MAX 100 słów. Styl: profesjonalny, praktyczny, bez ogólników.`;
+
+  try {
+    const res = await fetch(
+      BACKEND_URL ? `${BACKEND_URL}/query` : `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ contents:[{parts:[{text:prompt}]}],
+          generationConfig:{ temperature:0.3, maxOutputTokens:300,
+            thinkingConfig:{thinkingBudget:0} }}) }
+    );
+    const data = await res.json();
+    const text = data.candidates[0]?.content?.parts[0]?.text || '';
+
+    // Zapisz ocenę w currentResult żeby trafiła do eksportu
+    if (currentResult) currentResult.aiOcena = text;
+
+    // Pokaż ocenę jako kartę
+    const area = document.getElementById('resultArea');
+    let existing = document.getElementById('aiOcenaCard');
+    if (existing) existing.remove();
+
+    const card = document.createElement('div');
+    card.id = 'aiOcenaCard';
+    card.style.cssText = 'background:linear-gradient(135deg,rgba(124,106,247,0.12),rgba(52,211,153,0.06));border:1px solid rgba(124,106,247,0.3);border-radius:var(--radius);padding:16px;margin-bottom:12px;';
+    card.innerHTML = `
+      <div style="font-size:13px;font-weight:600;color:var(--accent2);margin-bottom:10px;">🧠 Ocena dietetyczna AI</div>
+      <div style="font-size:12px;color:var(--text);line-height:1.7;white-space:pre-line;">${text}</div>
+      <div style="font-size:10px;color:var(--text2);margin-top:8px;opacity:0.6;">Opinia wygenerowana przez Gemini · Nie zastępuje porady dietetyka</div>`;
+
+    // Wstaw na początku resultArea
+    area.insertBefore(card, area.firstChild);
+    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    showToast('🧠 Ocena gotowa!');
+  } catch(e) {
+    showToast('❌ ' + e.message.substring(0,40));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🧠';
+  }
+}
+
+// ============================================================
+// PKT 7: PRZELICZNIK PORCJI
+// ============================================================
+function przeliczPorcje(posilekNazwa, dzienIdx, posilekIdx, mnoznik) {
+  if (!currentResult) return;
+  const dzien = currentResult.json.dni[dzienIdx];
+  if (!dzien) return;
+  const posilek = dzien.posilki[posilekIdx];
+  if (!posilek) return;
+
+  // Skaluj składniki
+  posilek.skladniki = (posilek.skladniki||[]).map(s => skalujGrature(s, mnoznik));
+
+  // Przelicz makra
+  przeliczMakraPosilku(posilek.skladniki).then(makra => {
+    if (makra) { Object.assign(posilek, makra); posilek.zrodlo_makr = 'baza'; }
+    renderResult(currentResult.json);
+    showToast(mnoznik > 1 ? `✅ Porcja ×${mnoznik}` : `✅ Porcja ÷${1/mnoznik}`);
+  });
 }
 
 function shareResult() {
@@ -2388,17 +3126,17 @@ const FOOD_DB = {
   "edamame":{kcal:122,b:11.9,t:5.2, w:8.9, bl:5.2,wap:60, ze:2.3, mag:64, k:436, vit_c:9,  vit_a:9,  vit_d:0.0, vit_b12:0.0,fol:311,zn:1.4,ig:18,na:6,p:169,se:1.3,jo:3,nas:0.8,om3:0.3},
 
   // ===== ORZECHY I NASIONA =====
-  "migdały":{kcal:579,b:21.2,t:49.9,w:21.6,bl:12.5,wap:264,ze:3.7,mag:270,k:733, vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:44, zn:3.1,ig:0,na:1,p:484,se:2.5,jo:2,nas:3.8,om3:0.0},
-  "orzechy włoskie":{kcal:654,b:15.2,t:65.2,w:13.7,bl:6.7,wap:98, ze:2.9, mag:158,k:441, vit_c:1,  vit_a:1,  vit_d:0.0, vit_b12:0.0,fol:98, zn:3.1,ig:0,na:2,p:346,se:4.9,jo:2,nas:6.1,om3:9.1},
+  "migdały":{kcal:579,b:21.2,t:49.9,w:21.6,bl:12.5,wap:264,ze:3.7,mag:270,k:733, vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:44, zn:3.1,ig:15,na:1,p:484,se:2.5,jo:2,nas:3.8,om3:0.0},
+  "orzechy włoskie":{kcal:654,b:15.2,t:65.2,w:13.7,bl:6.7,wap:98, ze:2.9, mag:158,k:441, vit_c:1,  vit_a:1,  vit_d:0.0, vit_b12:0.0,fol:98, zn:3.1,ig:15,na:2,p:346,se:4.9,jo:2,nas:6.1,om3:9.1},
   "orzechy nerkowca":{kcal:553,b:18.2,t:43.9,w:30.2,bl:3.3,wap:37, ze:6.7, mag:292,k:660, vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:25, zn:5.8,ig:22,na:12,p:593,se:19.9,jo:2,nas:7.8,om3:0.1},
-  "orzechy laskowe":{kcal:628,b:15.0,t:60.8,w:16.7,bl:9.7,wap:114,ze:4.7, mag:163,k:680, vit_c:6,  vit_a:1,  vit_d:0.0, vit_b12:0.0,fol:113,zn:2.5,ig:0,na:0,p:290,se:2.4,jo:2,nas:4.5,om3:0.1},
-  "nasiona słonecznika":{kcal:584,b:20.8,t:51.5,w:20.0,bl:8.6,wap:78, ze:5.3, mag:325,k:645, vit_c:1,  vit_a:1,  vit_d:0.0, vit_b12:0.0,fol:227,zn:5.0,ig:0,na:9,p:660,se:53.0,jo:3,nas:4.5,om3:0.1},
-  "nasiona dyni":{kcal:559,b:30.2,t:49.1,w:10.7,bl:6.0,wap:46, ze:8.8, mag:592,k:809, vit_c:2,  vit_a:16, vit_d:0.0, vit_b12:0.0,fol:57, zn:7.8,ig:0,na:7,p:1174,se:9.4,jo:2,nas:8.7,om3:0.1},
+  "orzechy laskowe":{kcal:628,b:15.0,t:60.8,w:16.7,bl:9.7,wap:114,ze:4.7, mag:163,k:680, vit_c:6,  vit_a:1,  vit_d:0.0, vit_b12:0.0,fol:113,zn:2.5,ig:15,na:0,p:290,se:2.4,jo:2,nas:4.5,om3:0.1},
+  "nasiona słonecznika":{kcal:584,b:20.8,t:51.5,w:20.0,bl:8.6,wap:78, ze:5.3, mag:325,k:645, vit_c:1,  vit_a:1,  vit_d:0.0, vit_b12:0.0,fol:227,zn:5.0,ig:35,na:9,p:660,se:53.0,jo:3,nas:4.5,om3:0.1},
+  "nasiona dyni":{kcal:559,b:30.2,t:49.1,w:10.7,bl:6.0,wap:46, ze:8.8, mag:592,k:809, vit_c:2,  vit_a:16, vit_d:0.0, vit_b12:0.0,fol:57, zn:7.8,ig:25,na:7,p:1174,se:9.4,jo:2,nas:8.7,om3:0.1},
   "siemię lniane":{kcal:534,b:18.3,t:42.2,w:28.9,bl:27.3,wap:255,ze:5.7,mag:392,k:813, vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:87, zn:4.3,ig:35,na:30,p:642,se:25.4,jo:4,nas:3.7,om3:22.8},
   "nasiona chia":{kcal:486,b:16.5,t:30.7,w:42.1,bl:34.4,wap:631,ze:7.7,mag:335,k:407, vit_c:1,  vit_a:5,  vit_d:0.0, vit_b12:0.0,fol:49, zn:4.6,ig:1,na:16,p:860,se:55.2,jo:16,nas:3.3,om3:17.8},
   "masło orzechowe":{kcal:588,b:25.1,t:50.4,w:20.1,bl:6.0,wap:49, ze:1.9, mag:170,k:564, vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:87, zn:2.9,ig:14,na:153,p:358,se:3.7,jo:2,nas:10.4,om3:0.0},
-  "sezam":{kcal:573,b:17.7,t:49.7,w:23.5,bl:11.8,wap:975,ze:14.6,mag:351,k:468,vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:97, zn:7.8,ig:0,na:11,p:629,se:34.4,jo:2,nas:4.8,om3:0.4},
-  "tahini":{kcal:595,b:17.0,t:53.8,w:21.2,bl:9.3,wap:426,ze:8.9, mag:95, k:414, vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:78, zn:4.6,ig:0,na:115,p:592,se:34.4,jo:2,nas:6.0,om3:0.4},
+  "sezam":{kcal:573,b:17.7,t:49.7,w:23.5,bl:11.8,wap:975,ze:14.6,mag:351,k:468,vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:97, zn:7.8,ig:35,na:11,p:629,se:34.4,jo:2,nas:4.8,om3:0.4},
+  "tahini":{kcal:595,b:17.0,t:53.8,w:21.2,bl:9.3,wap:426,ze:8.9, mag:95, k:414, vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:78, zn:4.6,ig:35,na:115,p:592,se:34.4,jo:2,nas:6.0,om3:0.4},
 
   // ===== TŁUSZCZE =====
   "oliwa z oliwek":{kcal:884,b:0.0, t:100.0,w:0.0, bl:0,  wap:1,  ze:0.6, mag:0,  k:1,   vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:0,  zn:0.0,ig:0,na:2,p:0,se:0.0,jo:0,nas:13.8,om3:0.8},
@@ -2443,6 +3181,21 @@ const FOOD_DB = {
   "granola":{kcal:471,b:10.4,t:20.0,w:64.0,bl:6.5,wap:50, ze:3.6, mag:80, k:290, vit_c:1,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:25, zn:2.1,ig:62,na:50,p:250,se:18.0,jo:5,nas:3.5,om3:0.4},
   "tortilla pszenna":{kcal:306,b:8.0, t:7.3, w:53.0,bl:2.7,wap:60, ze:2.2, mag:22, k:155, vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:25, zn:0.8,ig:30,na:420,p:98,se:19.0,jo:3,nas:1.8,om3:0.1},
   "tortilla kukurydziana":{kcal:218,b:5.7, t:3.0, w:44.6,bl:4.0,wap:121,ze:1.2, mag:50, k:180, vit_c:0,  vit_a:6,  vit_d:0.0, vit_b12:0.0,fol:10, zn:0.7,ig:52,na:280,p:130,se:5.0,jo:2,nas:0.5,om3:0.05},
+  // === 14 NOWYCH PRODUKTÓW (USDA SR Legacy) ===
+  "kaczka":{kcal:201,b:27.4,t:10.2,w:0,bl:0,wap:12,ze:2.7,mag:19,k:271,vit_c:0,vit_a:72,vit_d:0,vit_b12:0.4,fol:11,zn:2,ig:0,na:74,p:203,se:22.6,jo:5,nas:3.5,om3:0.16},
+  "halibut":{kcal:91,b:18.6,t:1.9,w:0,bl:0,wap:60,ze:0.2,mag:28,k:435,vit_c:0,vit_a:30,vit_d:4.9,vit_b12:1,fol:12,zn:0.4,ig:0,na:69,p:236,se:36.5,jo:8,nas:0.3,om3:0.47},
+  "mintaj":{kcal:72,b:15.9,t:0.8,w:0,bl:0,wap:60,ze:0.4,mag:69,k:356,vit_c:0,vit_a:16,vit_d:2,vit_b12:3.2,fol:3,zn:0.5,ig:0,na:96,p:221,se:36.5,jo:32,nas:0.1,om3:0.14},
+  "małże":{kcal:86,b:11.9,t:2.2,w:3.7,bl:0,wap:46,ze:6.7,mag:37,k:268,vit_c:13,vit_a:48,vit_d:0.2,vit_b12:12,fol:42,zn:1.6,ig:0,na:286,p:197,se:44.8,jo:22,nas:0.4,om3:0.41},
+  "ghee":{kcal:900,b:0,t:99.8,w:0,bl:0,wap:4,ze:0,mag:0,k:5,vit_c:0,vit_a:840,vit_d:1.5,vit_b12:0,fol:0,zn:0.1,ig:0,na:2,p:3,se:0,jo:1,nas:61.9,om3:0.45},
+  "fasolka szparagowa":{kcal:31,b:1.8,t:0.1,w:7,bl:2.7,wap:37,ze:1,mag:25,k:211,vit_c:12,vit_a:35,vit_d:0,vit_b12:0,fol:33,zn:0.2,ig:30,na:6,p:38,se:0.6,jo:3,nas:0,om3:0.05},
+  "śliwka":{kcal:46,b:0.7,t:0.3,w:11.4,bl:1.4,wap:6,ze:0.2,mag:7,k:157,vit_c:9,vit_a:17,vit_d:0,vit_b12:0,fol:5,zn:0.1,ig:39,na:0,p:16,se:0,jo:1,nas:0,om3:0.05},
+  "jeżyny":{kcal:43,b:1.4,t:0.5,w:9.6,bl:5.3,wap:29,ze:0.6,mag:20,k:162,vit_c:21,vit_a:11,vit_d:0,vit_b12:0,fol:25,zn:0.5,ig:25,na:1,p:22,se:0.4,jo:2,nas:0,om3:0.09},
+  "porzeczki czarne":{kcal:63,b:1.4,t:0.4,w:15.4,bl:4.3,wap:55,ze:1.5,mag:24,k:322,vit_c:181,vit_a:12,vit_d:0,vit_b12:0,fol:8,zn:0.3,ig:15,na:2,p:59,se:0.6,jo:1,nas:0,om3:0.11},
+  "mandarynka":{kcal:53,b:0.8,t:0.3,w:13.3,bl:1.8,wap:37,ze:0.2,mag:12,k:166,vit_c:27,vit_a:34,vit_d:0,vit_b12:0,fol:16,zn:0.1,ig:43,na:2,p:20,se:0.1,jo:1,nas:0,om3:0.04},
+  "figi":{kcal:74,b:0.7,t:0.3,w:19.2,bl:2.9,wap:35,ze:0.4,mag:17,k:232,vit_c:2,vit_a:7,vit_d:0,vit_b12:0,fol:6,zn:0.2,ig:61,na:1,p:14,se:0.2,jo:3,nas:0,om3:0.09},
+  "soczewica zielona":{kcal:116,b:9,t:0.4,w:20.1,bl:7.9,wap:19,ze:3.3,mag:36,k:369,vit_c:1,vit_a:1,vit_d:0,vit_b12:0,fol:181,zn:1.3,ig:30,na:238,p:180,se:2.8,jo:4,nas:0.1,om3:0.05},
+  "tempeh":{kcal:193,b:18.5,t:10.8,w:9.4,bl:0,wap:111,ze:2.7,mag:81,k:412,vit_c:0,vit_a:0,vit_d:0,vit_b12:0,fol:0,zn:1.1,ig:0,na:9,p:266,se:0.1,jo:2,nas:2.2,om3:0.21},
+  "nasiona konopne":{kcal:553,b:31.6,t:48.8,w:8.7,bl:4,wap:70,ze:7.9,mag:700,k:859,vit_c:0.5,vit_a:0,vit_d:0,vit_b12:0,fol:110,zn:9.9,ig:0,na:5,p:1650,se:14.5,jo:0,nas:4.6,om3:8.7},
   "wafle ryżowe":{kcal:387,b:7.5, t:2.8, w:81.5,bl:3.5,wap:5,  ze:1.1, mag:49, k:100, vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:4,  zn:1.5,ig:85,na:3,p:155,se:15.0,jo:1,nas:0.6,om3:0.02},
   "bułka pszenna":{kcal:265,b:8.5, t:1.6, w:54.0,bl:2.3,wap:22, ze:1.7, mag:23, k:120, vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:22, zn:0.7,ig:73,na:490,p:95,se:20.0,jo:3,nas:0.4,om3:0.03},
   "otręby pszenne":{kcal:216,b:16.0,t:4.3, w:42.8,bl:42.8,wap:73,ze:10.6,mag:611,k:1182,vit_c:0,  vit_a:0,  vit_d:0.0, vit_b12:0.0,fol:79, zn:7.3,ig:42,na:2,p:1013,se:78.0,jo:5,nas:0.6,om3:0.2},
@@ -2497,30 +3250,86 @@ const FOOD_DB = {
 };
 
 // Szukaj produktu w bazie lokalnej (dopasowanie częściowe)
+// Słownik synonimów — opisowe nazwy Gemini → klucze bazy IŻŻ
+const SYNONIMY = {
+  'grillowany kurczak':'pierś z kurczaka', 'kurczak grillowany':'pierś z kurczaka',
+  'pieczony kurczak':'kurczak pieczony',   'kurczak pieczony':'kurczak pieczony',
+  'filet z kurczaka':'pierś z kurczaka',   'pierś kurczaka':'pierś z kurczaka',
+  'filet z łososia':'łosoś',              'łosoś pieczony':'łosoś',
+  'filet z dorsza':'filety z dorsza',
+  'grillowany łosoś':'łosoś',             'pieczony łosoś':'łosoś',
+  'jajka':'jajko',                        'jajek':'jajko',
+  'twaróg':'ser twarogowy chudy',         'serek':'serek wiejski',
+  'serek homogenizowany':'ser twarogowy chudy',
+  'ser cottage':'serek wiejski',
+  'makaron razowy':'makaron pełnoziarnisty',
+  'makaron z pełnego ziarna':'makaron pełnoziarnisty',
+  'ryż parboiled':'ryż biały',
+  'pieczywo chrupkie':'wafle ryżowe',
+  'chrupki':'wafle ryżowe',
+  'warzywa na parze':'brokuł',            'warzywa gotowane':'brokuł',
+  'sałatka warzywna':'sałata',            'mix sałat':'sałata',
+  'oliwa':'oliwa z oliwek',
+  'olej':'olej rzepakowy',
+  'ziemniaki gotowane':'ziemniaki',       'ziemniaki pieczone':'ziemniaki',
+  'kasza':'kasza gryczana',
+  'płatki':'płatki owsiane',
+  'chleb':'chleb graham',                 'pieczywo':'chleb graham',
+  'mleko':'mleko 2%',
+  'maślanka':'maślanka',
+  'śmietana':'śmietana 18%',
+  'owoce':'jabłko',                       'owoce sezonowe':'jabłko',
+  'warzywa':'marchew',
+  'fasola':'fasola czerwona',
+  'ryby':'dorsz',
+  'mięso':'pierś z kurczaka',
+  'drób':'pierś z kurczaka',
+  'wędlina':'szynka gotowana',
+};
+
 function szukajWBazie(nazwa) {
-  // Usuń gramatury i jednostki z nazwy przed szukaniem
+  if (!nazwa || typeof nazwa !== 'string') return null;
   const n = nazwa.toLowerCase()
     .replace(/\d+\s*(g|ml|szt|l|kg|dag)\b/gi, '')
     .replace(/\s+/g, ' ').trim();
 
+  // 1. Dokładne dopasowanie
   if (FOOD_DB[n]) return FOOD_DB[n];
 
-  // Posortuj klucze od najdłuższych (bardziej precyzyjne) do najkrótszych
+  // 2. Słownik synonimów
+  for (const [syn, cel] of Object.entries(SYNONIMY)) {
+    if (n.includes(syn) || syn.includes(n)) {
+      if (FOOD_DB[cel]) return FOOD_DB[cel];
+    }
+  }
+
+  // 3. Posortuj klucze od najdłuższych
   const posortowane = Object.keys(FOOD_DB).sort((a, b) => b.length - a.length);
 
-  // Szukaj klucza który zawiera się w oczyszczonej nazwie
+  // 4. Klucz zawiera się w nazwie (np. "pierś z kurczaka" w "grillowana pierś z kurczaka 150g")
   const wNazwie = posortowane.find(k => n.includes(k));
   if (wNazwie) return FOOD_DB[wNazwie];
 
-  // Szukaj po pierwszych 2 słowach
+  // 5. Dwa pierwsze słowa
   const dwaSlowa = n.split(' ').slice(0, 2).join(' ');
   const wKluczu = posortowane.find(k => k.includes(dwaSlowa) || dwaSlowa.includes(k));
   if (wKluczu) return FOOD_DB[wKluczu];
 
-  // Fallback: pierwsze słowo
+  // 6. Pierwsze słowo
   const pierwszeSlowo = n.split(' ')[0];
-  const poSlowie = posortowane.find(k => k.startsWith(pierwszeSlowo));
-  return poSlowie ? FOOD_DB[poSlowie] : null;
+  if (pierwszeSlowo.length >= 4) { // Minimum 4 znaki żeby nie mylić "ser" z "seler"
+    const poSlowie = posortowane.find(k => k.startsWith(pierwszeSlowo));
+    if (poSlowie) return FOOD_DB[poSlowie];
+  }
+
+  // 7. Sprawdź cache USDA i AI
+  const cacheKey = n;
+  const usdaCache = getUSDACache ? getUSDACache() : {};
+  if (usdaCache[cacheKey]) return usdaCache[cacheKey];
+  const aiCache = getAICache ? getAICache() : {};
+  if (aiCache[cacheKey]) return aiCache[cacheKey];
+
+  return null;
 }
 
 // Parsuj gramaturę ze składnika np. "płatki owsiane 60g" lub "mleko 200ml" → liczba
@@ -2697,9 +3506,9 @@ function zapiszUSDAlKey() {
   showToast('✅ Klucz USDA zapisany!');
 }
 
-// Generator AI — generuje ~150 produktów w wybranej kategorii
+// Generator AI — generuje produkty w wybranej kategorii (partiami po 25)
 async function generujProduktyAI() {
-  if (!apiKey) { openKeyModal(); showToast('⚠️ Wpisz klucz Gemini API'); return; }
+  if (!apiKey && !BACKEND_URL) { openKeyModal(); showToast('⚠️ Wpisz klucz Gemini API'); return; }
   const kategoria = getChipVal('kategoriaChips') || 'warzywa_owoce';
   const btn = document.getElementById('genBazaBtn');
   const status = document.getElementById('genBazaStatus');
@@ -2718,68 +3527,130 @@ async function generujProduktyAI() {
   };
 
   const opisKategorii = nazwyKategorii[kategoria] || kategoria;
-  status.textContent = '🤖 Gemini analizuje składniki odżywcze...';
 
-  const prompt = `Wygeneruj dane odżywcze dla 80 produktów z kategorii: ${opisKategorii}.
+  // Generuj w 3 partiach po 25 produktów (bezpieczny rozmiar odpowiedzi)
+  const PARTIE = 3;
+  const NA_PARTIE = 25;
+  let wszystkieProdukty = [];
+  let uzywaneNazwy = [];
 
-Dla każdego produktu podaj wartości NA 100g produktu w surowej/naturalnej postaci.
-Używaj polskich nazw produktów.
+  for (let partia = 1; partia <= PARTIE; partia++) {
+    status.textContent = `🤖 Generuję partię ${partia}/${PARTIE} (~${NA_PARTIE} produktów)...`;
 
-Zwróć TYLKO JSON (tablica):
-[
-  {
-    "nazwa": "nazwa po polsku",
-    "kcal": number,
-    "b": number,
-    "t": number,
-    "w": number,
-    "bl": number,
-    "wap": number,
-    "ze": number,
-    "mag": number,
-    "k": number,
-    "vit_c": number,
-    "vit_a": number,
-    "vit_d": number,
-    "vit_b12": number,
-    "fol": number,
-    "zn": number,
-    "na": number,
-    "p": number,
-    "se": number,
-    "jo": number,
-    "nas": number,
-    "om3": number,
-    "ig": number
-  }
-]
+    const unikajStr = uzywaneNazwy.length > 0
+      ? `\nNie powtarzaj tych produktów: ${uzywaneNazwy.slice(-20).join(', ')}.` : '';
 
-Podaj realne wartości z tabel odżywczych USDA/IŻŻ. ig=0 dla mięs/ryb/nabiału.`;
+    const prompt = `Wygeneruj dane odżywcze dla dokładnie ${NA_PARTIE} produktów z kategorii: ${opisKategorii}.${unikajStr}
 
-  try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-      {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({
-          contents:[{parts:[{text:prompt}]}],
-          generationConfig:{temperature:0.3,maxOutputTokens:8192,responseMimeType:'application/json',thinkingConfig:{thinkingBudget:0}}
-        })
+Dla każdego produktu: wartości NA 100g, polska nazwa.
+Zwróć TYLKO JSON (tablica ${NA_PARTIE} obiektów):
+[{"nazwa":"string","kcal":n,"b":n,"t":n,"w":n,"bl":n,"wap":n,"ze":n,"mag":n,"k":n,"vit_c":n,"vit_a":n,"vit_d":n,"vit_b12":n,"fol":n,"zn":n,"na":n,"p":n,"se":n,"jo":n,"nas":n,"om3":n,"ig":n}]
+Realne wartości USDA/IŻŻ. ig=0 dla mięs/ryb/nabiału. Liczby bez jednostek.`;
+
+    try {
+      let text = '';
+      // Retry 3 razy
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        const res = await fetch(
+          BACKEND_URL ? `${BACKEND_URL}/query` : `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: {
+                temperature: 0.3,
+                maxOutputTokens: 4096, // Bezpieczny limit dla 25 produktów
+                responseMimeType: 'application/json',
+                thinkingConfig: { thinkingBudget: 0 }
+              }
+            })
+          }
+        );
+
+        if (!res.ok) {
+          const e = await res.json().catch(()=>({}));
+          if ((res.status === 503 || res.status === 429) && attempt < 3) {
+            status.textContent = `⏳ Serwer zajęty, próba ${attempt+1}/3...`;
+            await new Promise(r => setTimeout(r, 2000 * attempt));
+            continue;
+          }
+          throw new Error(e.error?.message || `HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+        text = data.candidates[0]?.content?.parts[0]?.text || '';
+        text = text.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+        break;
       }
-    );
 
-    if (!res.ok) { const e=await res.json(); throw new Error(e.error?.message||'Błąd API'); }
-    const data = await res.json();
-    let text = data.candidates[0]?.content?.parts[0]?.text||'';
-    text = text.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
-    const produkty = JSON.parse(text);
+      if (!text) continue;
 
-    if (!Array.isArray(produkty)) throw new Error('Nieprawidłowy format odpowiedzi');
+      // Naprawa urwanego JSON — dwie strategie
+      let produkty = null;
+
+      // Strategia 1: normalny parse
+      try {
+        produkty = JSON.parse(text);
+      } catch(e) {
+        // Strategia 2: napraw urwany JSON
+        // Znajdź ostatni kompletny obiekt }
+        let naprawiony = text;
+
+        // Usuń urwany ostatni obiekt (niekompletny)
+        const ostatniKlamra = naprawiony.lastIndexOf('},');
+        const ostatniKlamraBez = naprawiony.lastIndexOf('}');
+
+        // Spróbuj zamknąć tablicę po ostatnim kompletnym obiekcie
+        if (ostatniKlamra > 0) {
+          naprawiony = naprawiony.substring(0, ostatniKlamra + 1) + ']';
+        } else if (ostatniKlamraBez > 0) {
+          naprawiony = naprawiony.substring(0, ostatniKlamraBez + 1) + ']';
+        }
+
+        // Upewnij się że zaczyna od [
+        if (!naprawiony.trim().startsWith('[')) {
+          naprawiony = '[' + naprawiony;
+        }
+
+        try {
+          produkty = JSON.parse(naprawiony);
+          console.log(`Partia ${partia}: naprawiono urwany JSON, odzyskano ${produkty.length} produktów`);
+        } catch(e2) {
+          // Strategia 3: wyciągnij kompletne obiekty przez regex
+          const matches = text.match(/\{[^{}]+\}/g) || [];
+          produkty = matches.map(m => { try { return JSON.parse(m); } catch { return null; } })
+                            .filter(Boolean);
+          if (produkty.length > 0) {
+            console.log(`Partia ${partia}: regex wyciągnął ${produkty.length} produktów`);
+          } else {
+            status.textContent = `⚠️ Partia ${partia} — błąd parsowania, pomijam`;
+            continue;
+          }
+        }
+      }
+
+      if (!Array.isArray(produkty)) continue;
+
+      wszystkieProdukty = wszystkieProdukty.concat(produkty);
+      uzywaneNazwy = uzywaneNazwy.concat(produkty.map(p => p.nazwa).filter(Boolean));
+
+    } catch(e) {
+      console.warn(`Partia ${partia} nieudana:`, e.message);
+      status.textContent = `⚠️ Partia ${partia} nieudana: ${e.message.substring(0,40)}`;
+    }
+
+    // Krótka przerwa między partiami żeby nie przeciążać API
+    if (partia < PARTIE) await new Promise(r => setTimeout(r, 500));
+  }
+
+  // Zapisz wszystkie zebrane produkty do cache AI
+  try {
+    if (wszystkieProdukty.length === 0) throw new Error('Brak produktów do zapisania');
 
     const aiCache = getAICache();
     let dodano = 0;
-    produkty.forEach(p => {
+    wszystkieProdukty.forEach(p => {
       if (p.nazwa && p.kcal) {
         const key = p.nazwa.toLowerCase().trim();
         if (!szukajWBazie(p.nazwa) && !getUSDACache()[key]) {
@@ -2908,12 +3779,23 @@ async function przeliczMakraPosilku(skladniki) {
   for (const s of (skladniki || [])) {
     const gramy = parsujGramy(s);
     if (!gramy) continue;
-    // Szukaj: baza wbudowana → cache USDA → cache AI → USDA API
+    // Szukaj: baza wbudowana → cache USDA → cache AI → USDA API → AI szacowanie
     const znalezione = szukajWszedzie(s);
     let dane = znalezione ? znalezione.dane : null;
     if (!dane) {
       const nazwaBezGramow = s.replace(/\d+\s*(g|ml|dag|szt|l|kg)\b/gi,'').trim();
       dane = await pobierzZUSDAplus(nazwaBezGramow);
+    }
+    // Ostatni fallback: użyj wartości z promptu Gemini jeśli są w składniku
+    // (Gemini czasem podaje kcal w nazwie np. "sos pomidorowy ~30kcal 100g")
+    if (!dane) {
+      const kcalInline = s.match(/~?(\d+)\s*kcal/i);
+      if (kcalInline) {
+        dane = { kcal: parseInt(kcalInline[1]), b:3, t:2, w:5, bl:0.5,
+                 wap:10, ze:0.3, mag:10, k:100, vit_c:2, vit_a:5,
+                 vit_d:0, vit_b12:0, fol:5, zn:0.3, na:50, p:50,
+                 se:2, jo:2, nas:0.5, om3:0.05, ig:30 };
+      }
     }
     if (dane) {
       const m = gramy / 100;
@@ -2971,6 +3853,382 @@ async function przeliczMakraPosilku(skladniki) {
 }
 
 // Wzbogać cały jadłospis o makra z bazy (nadpisuje wartości Gemini)
+// ============================================================
+// SKALOWANIE POSIŁKÓW DO CELU KALORYCZNEGO
+// Koryguje gramaturę składników żeby suma dnia trafiła w cel
+// ============================================================
+function skalujGrature(skladnik, mnoznik) {
+  // Znajdź liczbę i jednostkę w składniku
+  return skladnik.replace(/(\d+(?:[.,]\d+)?)\s*(g|ml|dag)\b/gi, (match, liczba, jednostka) => {
+    const nowa = Math.round(parseFloat(liczba.replace(',','.')) * mnoznik);
+    return `${nowa}${jednostka}`;
+  });
+}
+
+async function skalujPosilkiDoCelu(json, doceloweKcal, callGeminiFn, promptParams) {
+  if (!doceloweKcal || doceloweKcal <= 0) return json;
+
+  const mikro_pola = ['wapn_mg','zelazo_mg','magnez_mg','potas_mg','vit_c_mg','vit_a_ug','vit_d_ug','vit_b12_ug','folany_ug','cynk_mg','sod_mg','fosfor_mg','selen_ug','jod_ug','nas_g','omega3_g'];
+  let skalowanoDni = 0, regenerowanoDni = 0, korektaMakroDni = 0, kalibrowanoDni = 0;
+
+  // Pobierz docelowe makro z params
+  const doceloweBialko   = promptParams?.doceloweBialko   || Math.round(doceloweKcal * 0.25 / 4);
+  const doceloweTluszcze = promptParams?.doceloweTluszcze || Math.round(doceloweKcal * 0.30 / 9);
+  const doceloweWegl     = promptParams?.doceloweWegl     || Math.round(doceloweKcal * 0.45 / 4);
+  const tolerancjaMakro  = 0.20;
+  const diet             = promptParams?.diet || 'tradycyjna';
+
+  // ============================================================
+  // Katalog produktów kalibracyjnych
+  // Dobierane inteligentnie zależnie od diety i brakujących makro
+  // ============================================================
+  const PRODUKTY_KAL = [
+    // [nazwa, kcal/100g, b/100g, t/100g, w/100g, minG, maxG, krok, diety]
+    { n:'pierś z kurczaka', k:110, b:23.1, t:1.8,  w:0,    min:25, max:150, krok:25, vege:false },
+    { n:'tofu',             k:76,  b:8.1,  t:4.8,  w:1.9,  min:50, max:150, krok:25, vege:true  },
+    { n:'ryż brązowy',      k:111, b:2.6,  t:0.9,  w:22.8, min:20, max:100, krok:20, vege:true  },
+    { n:'płatki owsiane',   k:372, b:12.5, t:7.1,  w:61,   min:20, max:60,  krok:10, vege:true  },
+    { n:'kasza gryczana',   k:92,  b:3.4,  t:0.6,  w:19.9, min:20, max:80,  krok:20, vege:true  },
+    { n:'orzechy włoskie',  k:654, b:15.2, t:65.2, w:7,    min:10, max:40,  krok:10, vege:true  },
+    { n:'migdały',          k:575, b:21.2, t:49.9, w:21,   min:10, max:40,  krok:10, vege:true  },
+    { n:'oliwa z oliwek',   k:884, b:0,    t:100,  w:0,    min:5,  max:20,  krok:5,  vege:true  },
+    { n:'masło orzechowe',  k:588, b:25,   t:50,   w:20,   min:10, max:30,  krok:5,  vege:true  },
+    { n:'awokado',          k:160, b:2,    t:14.7, w:8.5,  min:50, max:150, krok:25, vege:true  },
+    { n:'ser twarogowy chudy', k:81,b:17,  t:0.4,  w:2.7,  min:50, max:150, krok:25, vege:true  },
+  ];
+
+  // Funkcja dobierająca produkty kalibracyjne
+  function dobierzProduktyKal(brakujeKcal, sumaMakro, diet) {
+    const isVege = ['wegetariańska','wegańska'].includes(diet);
+    const isKeto = diet === 'ketogeniczna';
+    const dostepne = PRODUKTY_KAL.filter(p => !isVege || p.vege);
+
+    const wynik = [];
+    let pozostalo = brakujeKcal;
+
+    // 1. Brakuje białka → dodaj źródło białka
+    const brakujeB = doceloweBialko - sumaMakro.b;
+    if (brakujeB > 10 && !isKeto) {
+      const prod = dostepne.find(p => p.b > 15 && (!isVege || p.vege));
+      if (prod) {
+        const g = Math.min(prod.max, Math.max(prod.min,
+          Math.round(brakujeB / (prod.b/100) / prod.krok) * prod.krok));
+        const kcalProd = Math.round(prod.k * g / 100);
+        if (kcalProd <= pozostalo * 1.3) {
+          wynik.push({ skladnik: `${prod.n} ${g}g`, dane: prod, g });
+          pozostalo -= kcalProd;
+        }
+      }
+    }
+
+    // 2. Brakuje węglowodanów → ryż lub kasza
+    const brakujeW = doceloweWegl - sumaMakro.w;
+    if (brakujeW > 15 && !isKeto && pozostalo > 50) {
+      const prod = dostepne.find(p => p.w > 15 && p.t < 5);
+      if (prod) {
+        const g = Math.min(prod.max, Math.max(prod.min,
+          Math.round(brakujeW / (prod.w/100) / prod.krok) * prod.krok));
+        const kcalProd = Math.round(prod.k * g / 100);
+        if (kcalProd <= pozostalo * 1.3) {
+          wynik.push({ skladnik: `${prod.n} ${g}g`, dane: prod, g });
+          pozostalo -= kcalProd;
+        }
+      }
+    }
+
+    // 3. Reszta → tłuszcz zdrowy (orzechy → oliwa)
+    const tluszcze = isKeto
+      ? dostepne.filter(p => p.t > 50)
+      : dostepne.filter(p => p.t > 30 && p.k > 400);
+
+    for (const prod of tluszcze) {
+      if (pozostalo < 30) break;
+      const g = Math.min(prod.max, Math.max(prod.min,
+        Math.round(pozostalo / (prod.k/100) / prod.krok) * prod.krok));
+      const kcalProd = Math.round(prod.k * g / 100);
+      if (kcalProd < 20 || kcalProd > pozostalo * 1.5) continue;
+      wynik.push({ skladnik: `${prod.n} ${g}g`, dane: prod, g });
+      pozostalo -= kcalProd;
+      if (pozostalo < 50) break;
+    }
+
+    return wynik;
+  }
+
+  // ============================================================
+  // KROK 1: Kalibracja kcal (skalowanie → kalibracja → regeneracja)
+  // ============================================================
+  for (let di = 0; di < (json.dni || []).length; di++) {
+    const dzien = json.dni[di];
+    const kcalDnia = (dzien.posilki || []).reduce((s, p) => s + (p.kcal || 0), 0);
+    if (kcalDnia <= 0) continue;
+
+    const odchylenie = Math.abs(kcalDnia - doceloweKcal) / doceloweKcal;
+    if (odchylenie < 0.03) continue;
+
+    if (odchylenie <= 0.25) {
+      // ---- Skaluj gramaturę proporcjonalnie ----
+      const mnoznik = doceloweKcal / kcalDnia;
+      skalowanoDni++;
+      for (const posilek of (dzien.posilki || [])) {
+        posilek.skladniki = (posilek.skladniki || []).map(s => skalujGrature(s, mnoznik));
+        const noweMakra = await przeliczMakraPosilku(posilek.skladniki);
+        if (noweMakra) {
+          // Chroń kcal/makro obliczone przez RAG — aktualizuj tylko mikro
+          const _mikro = ['wapn_mg','zelazo_mg','magnez_mg','potas_mg','vit_c_mg','vit_a_ug','vit_d_ug','vit_b12_ug','folany_ug','cynk_mg','sod_mg','fosfor_mg','selen_ug','jod_ug','nas_g','omega3_g'];
+          _mikro.forEach(f => { if (noweMakra[f] !== undefined) posilek[f] = noweMakra[f]; });
+          if (noweMakra.blonnik_g !== undefined) posilek.blonnik_g = noweMakra.blonnik_g;
+          posilek.zrodlo_makr = 'baza';
+        }
+      }
+
+    } else {
+      // ---- Odchylenie >25%: najpierw spróbuj kalibracji iteracyjnej ----
+      const sumaMakro = (dzien.posilki||[]).reduce((acc,p) => ({
+        b: acc.b+(p.bialko_g||0), t: acc.t+(p.tluszcze_g||0), w: acc.w+(p.weglowodany_g||0)
+      }), {b:0, t:0, w:0});
+
+      const brakujeKcal = doceloweKcal - kcalDnia;
+      const jestZaDuzo  = brakujeKcal < 0;
+
+      if (!jestZaDuzo && brakujeKcal <= doceloweKcal * 0.60) {
+        // Brakuje do 60% → dołóż produkty kalibracyjne
+        const doLozenia = dobierzProduktyKal(brakujeKcal, sumaMakro, diet);
+
+        if (doLozenia.length > 0) {
+          // Znajdź ostatni posiłek dnia i dodaj do jego składników
+          const ostatniPosilek = dzien.posilki[dzien.posilki.length - 1];
+          for (const { skladnik } of doLozenia) {
+            ostatniPosilek.skladniki = [...(ostatniPosilek.skladniki||[]), skladnik];
+          }
+          // Przelicz makra ostatniego posiłku po dodaniu
+          const noweMakra = await przeliczMakraPosilku(ostatniPosilek.skladniki);
+          if (noweMakra) { Object.assign(ostatniPosilek, noweMakra); ostatniPosilek.zrodlo_makr = 'baza'; }
+
+          // Sprawdź wynik po kalibracji
+          const kcalPo = (dzien.posilki||[]).reduce((s,p)=>s+(p.kcal||0),0);
+          const odchPo = Math.abs(kcalPo - doceloweKcal) / doceloweKcal;
+
+          // Jeśli wciąż odbiega o 3-25% → doskaluj
+          if (odchPo >= 0.03 && odchPo <= 0.25) {
+            const mnoznik = doceloweKcal / kcalPo;
+            for (const posilek of (dzien.posilki||[])) {
+              posilek.skladniki = (posilek.skladniki||[]).map(s => skalujGrature(s, mnoznik));
+              const m = await przeliczMakraPosilku(posilek.skladniki);
+              if (m) { Object.assign(posilek, m); posilek.zrodlo_makr = 'baza'; }
+            }
+          }
+          kalibrowanoDni++;
+          continue; // pomiń regenerację — kalibracja wystarczyła
+        }
+      }
+
+      if (jestZaDuzo) {
+        // Za dużo kcal → zmniejsz gramaturę węglowodanów w największym posiłku
+        const najwiekszy = (dzien.posilki||[]).reduce((max,p) =>
+          (p.kcal||0) > (max.kcal||0) ? p : max, dzien.posilki[0]);
+        if (najwiekszy) {
+          const mnoznik = doceloweKcal / kcalDnia;
+          const bezpieczny = Math.max(0.50, Math.min(1.50, mnoznik));
+          najwiekszy.skladniki = (najwiekszy.skladniki||[]).map(s => skalujGrature(s, bezpieczny));
+          const m = await przeliczMakraPosilku(najwiekszy.skladniki);
+          if (m) { Object.assign(najwiekszy, m); najwiekszy.zrodlo_makr = 'baza'; }
+          kalibrowanoDni++;
+          continue;
+        }
+      }
+
+      // ---- Ostateczność: regeneracja przez Gemini ----
+      if (callGeminiFn && promptParams) {
+        try {
+          const { gender, age, height, weight, activity, goal, diet: d, meals,
+                  allergies, wytyczneKliniczne, mode, disease, bazaHint,
+                  kcalMin, kcalMax, trybOpis, dabrowskaOpis, tolerancjaPct } = promptParams;
+
+          const numerDnia = di + 1;
+          const istniejacePosilki = json.dni
+            .filter((_, i) => i !== di)
+            .flatMap(dn => dn.posilki.map(p => p.nazwa)).join(', ');
+
+          const promptDnia = `Ułóż jadłospis na 1 dzień (Dzień ${numerDnia}) dla osoby: ${gender}, ${age} lat, ${height}cm, ${weight}kg, aktywność: ${activity}, cel: ${goal}, dieta: ${d}, ${meals} posiłków/dzień${allergies ? ', wykluczone produkty: '+allergies : ''}.
+
+KLUCZOWE WYMOGI:
+- Kaloryczność dnia: ${kcalMin}–${kcalMax} kcal (cel: ${doceloweKcal})
+- Białko: ~${doceloweBialko}g (±20%), Tłuszcze: ~${doceloweTluszcze}g (±20%), Węglowodany: ~${doceloweWegl}g (±20%)
+Używaj składników z bazy IŻŻ: ${bazaHint}
+Podaj gramaturę każdego składnika. ZAKAZ dań złożonych — tylko podstawowe składniki (zamiast "bigos" → kapusta kiszona + wieprzowina + kiełbasa).
+${trybOpis ? 'WYTYCZNE KLINICZNE: '+trybOpis : ''}${dabrowskaOpis||''}${wytyczneKliniczne ? '\nDODATKOWE WYTYCZNE:\n'+wytyczneKliniczne : ''}
+Nie powtarzaj: ${istniejacePosilki || 'brak'}.
+Zwróć TYLKO JSON:
+{"dzien":"Dzień ${numerDnia}","posilki":[{"pora":"string","nazwa":"string","skladniki":["składnik gramatura"],"kcal":number,"bialko_g":number,"tluszcze_g":number,"weglowodany_g":number}]}`;
+
+          const nowyDzienJSON = await callGeminiFn(promptDnia);
+          if (nowyDzienJSON?.posilki?.length) {
+            for (const p of nowyDzienJSON.posilki) {
+              const makra = await przeliczMakraPosilku(p.skladniki);
+              if (makra) { Object.assign(p, makra); p.zrodlo_makr = 'baza'; }
+              else { p.zrodlo_makr = 'ai'; }
+            }
+            const kcalNowy = nowyDzienJSON.posilki.reduce((s,p)=>s+(p.kcal||0),0);
+            const odchNowy = Math.abs(kcalNowy - doceloweKcal) / doceloweKcal;
+            if (odchNowy < odchylenie) {
+              json.dni[di] = nowyDzienJSON;
+              // Po regeneracji → jeszcze raz skaluj jeśli potrzeba
+              if (odchNowy >= 0.03 && odchNowy <= 0.25) {
+                const mnoznik2 = doceloweKcal / kcalNowy;
+                for (const p of json.dni[di].posilki) {
+                  p.skladniki = (p.skladniki||[]).map(s => skalujGrature(s, mnoznik2));
+                  const m2 = await przeliczMakraPosilku(p.skladniki);
+                  if (m2) {
+                  // Chroń kcal/makro obliczone przez RAG — aktualizuj tylko mikro
+                  const _mikro = ['wapn_mg','zelazo_mg','magnez_mg','potas_mg','vit_c_mg','vit_a_ug','vit_d_ug','vit_b12_ug','folany_ug','cynk_mg','sod_mg','fosfor_mg','selen_ug','jod_ug','nas_g','omega3_g'];
+                  _mikro.forEach(f => { if (m2[f] !== undefined) p[f] = m2[f]; });
+                  if (m2.blonnik_g !== undefined) p.blonnik_g = m2.blonnik_g;
+                  p.zrodlo_makr = 'baza';
+                }
+                }
+              } else if (odchNowy > 0.25) {
+                // Po regeneracji nadal >25% → kalibracja iteracyjna jako ostatni ratunek
+                const brakPoRegen = doceloweKcal - kcalNowy;
+                if (brakPoRegen > 0) {
+                  const sumaMakroNowe = (json.dni[di].posilki||[]).reduce((acc,p)=>({
+                    b:acc.b+(p.bialko_g||0), t:acc.t+(p.tluszcze_g||0), w:acc.w+(p.weglowodany_g||0)
+                  }), {b:0,t:0,w:0});
+                  const doLozeniaNowe = dobierzProduktyKal(brakPoRegen, sumaMakroNowe, diet);
+                  if (doLozeniaNowe.length > 0) {
+                    const ost = json.dni[di].posilki[json.dni[di].posilki.length-1];
+                    for (const { skladnik } of doLozeniaNowe) ost.skladniki.push(skladnik);
+                    const mOst = await przeliczMakraPosilku(ost.skladniki);
+                    if (mOst) {
+                      // Chroń kcal/makro obliczone przez RAG — aktualizuj tylko mikro
+                      const _mikro = ['wapn_mg','zelazo_mg','magnez_mg','potas_mg','vit_c_mg','vit_a_ug','vit_d_ug','vit_b12_ug','folany_ug','cynk_mg','sod_mg','fosfor_mg','selen_ug','jod_ug','nas_g','omega3_g'];
+                      _mikro.forEach(f => { if (mOst[f] !== undefined) ost[f] = mOst[f]; });
+                      if (mOst.blonnik_g !== undefined) ost.blonnik_g = mOst.blonnik_g;
+                      ost.zrodlo_makr = 'baza';
+                    }
+                  }
+                }
+              }
+              regenerowanoDni++;
+            }
+          }
+        } catch(e) { console.warn('Regeneracja dnia nieudana:', e.message); }
+      }
+    }
+  }
+
+  // ============================================================
+  // KROK 2: Weryfikacja i korekcja makroskładników
+  // Sprawdza B/T/W każdego dnia i koryguje posiłek który
+  // najbardziej odchyla dany makroskładnik od celu
+  // ============================================================
+  for (let di = 0; di < (json.dni || []).length; di++) {
+    const dzien = json.dni[di];
+    const posilki = dzien.posilki || [];
+
+    const sumaDnia = () => posilki.reduce((acc, p) => ({
+      kcal: acc.kcal + (p.kcal||0),
+      b:    acc.b    + (p.bialko_g||0),
+      t:    acc.t    + (p.tluszcze_g||0),
+      w:    acc.w    + (p.weglowodany_g||0),
+    }), {kcal:0, b:0, t:0, w:0});
+
+    let s = sumaDnia();
+
+    // Sprawdź które makro najbardziej odchyla
+    const odchB = (s.b - doceloweBialko) / doceloweBialko;
+    const odchT = (s.t - doceloweTluszcze) / doceloweTluszcze;
+    const odchW = (s.w - doceloweWegl) / doceloweWegl;
+
+    // Lista makroskładników poza tolerancją
+    const problemyMakro = [];
+    if (Math.abs(odchB) > tolerancjaMakro) problemyMakro.push({ nazwa:'białko', odch: odchB, klucz:'b', posilek_klucz:'bialko_g', cel: doceloweBialko });
+    if (Math.abs(odchT) > tolerancjaMakro) problemyMakro.push({ nazwa:'tłuszcze', odch: odchT, klucz:'t', posilek_klucz:'tluszcze_g', cel: doceloweTluszcze });
+    if (Math.abs(odchW) > tolerancjaMakro) problemyMakro.push({ nazwa:'węglowodany', odch: odchW, klucz:'w', posilek_klucz:'weglowodany_g', cel: doceloweWegl });
+
+    if (problemyMakro.length === 0) continue; // Makro OK
+
+    korektaMakroDni++;
+
+    // Dla każdego problematycznego makroskładnika
+    for (const problem of problemyMakro) {
+      // Znajdź posiłek który najbardziej przyczynia się do odchylenia
+      // Jeśli za dużo T → znajdź posiłek z największą ilością tłuszczu
+      // Jeśli za mało B → znajdź posiłek z najmniejszą ilością białka
+      let targetPosilek;
+      if (problem.odch > 0) {
+        // Za dużo — znajdź posiłek z największą wartością tego makro
+        targetPosilek = posilki.reduce((max, p) =>
+          (p[problem.posilek_klucz]||0) > (max[problem.posilek_klucz]||0) ? p : max, posilki[0]);
+      } else {
+        // Za mało — znajdź posiłek z najmniejszą wartością (ale nie 0)
+        const niePuste = posilki.filter(p => (p[problem.posilek_klucz]||0) > 0);
+        if (!niePuste.length) continue;
+        targetPosilek = niePuste.reduce((min, p) =>
+          (p[problem.posilek_klucz]||0) < (min[problem.posilek_klucz]||0) ? p : min, niePuste[0]);
+      }
+
+      if (!targetPosilek) continue;
+
+      // Oblicz mnożnik korekcji dla tego posiłku
+      // Chcemy zmienić jego gramaturę tak żeby zbliżyć sumę do celu
+      // ale tylko w zakresie 0.7-1.4 (±40% gramatury posiłku)
+      const obecnaWartoscMakro = targetPosilek[problem.posilek_klucz] || 0;
+      if (obecnaWartoscMakro <= 0) continue;
+
+      const sumaReszty = s[problem.klucz] - obecnaWartoscMakro;
+      const potrzebnaNowaMakro = problem.cel - sumaReszty;
+      const mnoznikMakro = potrzebnaNowaMakro / obecnaWartoscMakro;
+
+      // Ogranicz mnożnik do rozsądnego zakresu (nie zmieniaj gramatury o więcej niż ±40%)
+      const mnoznikBezpieczny = Math.max(0.60, Math.min(1.40, mnoznikMakro));
+
+      // Skaluj składniki tego posiłku
+      targetPosilek.skladniki = (targetPosilek.skladniki||[]).map(s => skalujGrature(s, mnoznikBezpieczny));
+      const noweMakra = await przeliczMakraPosilku(targetPosilek.skladniki);
+      if (noweMakra) {
+        if (noweMakra) {
+          // Chroń kcal/makro obliczone przez RAG — aktualizuj tylko mikro
+          const _mikro = ['wapn_mg','zelazo_mg','magnez_mg','potas_mg','vit_c_mg','vit_a_ug','vit_d_ug','vit_b12_ug','folany_ug','cynk_mg','sod_mg','fosfor_mg','selen_ug','jod_ug','nas_g','omega3_g'];
+          _mikro.forEach(f => { if (noweMakra[f] !== undefined) targetPosilek[f] = noweMakra[f]; });
+          if (noweMakra.blonnik_g !== undefined) targetPosilek.blonnik_g = noweMakra.blonnik_g;
+          targetPosilek.zrodlo_makr = 'baza';
+        }
+        targetPosilek._korygowan = (targetPosilek._korygowan||[]).concat(problem.nazwa);
+      }
+
+      // Przelicz sumę po korekcie
+      s = sumaDnia();
+    }
+  }
+
+  // ============================================================
+  // KROK 3: Przelicz sumy dzienne po wszystkich korektach
+  // ============================================================
+  const liczbaDni = json.dni?.length || 1;
+  const suma = json.dni?.reduce((acc, d) => {
+    for (const p of (d.posilki||[])) {
+      acc.kcal += p.kcal||0; acc.b += p.bialko_g||0;
+      acc.t += p.tluszcze_g||0; acc.w += p.weglowodany_g||0; acc.bl += p.blonnik_g||0;
+      for (const pole of mikro_pola) acc[pole] = (acc[pole]||0) + (p[pole]||0);
+    }
+    return acc;
+  }, { kcal:0, b:0, t:0, w:0, bl:0 });
+
+  json.kcal_dziennie = Math.round(suma.kcal / liczbaDni);
+  json.bialko_g      = Math.round(suma.b  / liczbaDni * 10) / 10;
+  json.tluszcze_g    = Math.round(suma.t  / liczbaDni * 10) / 10;
+  json.weglowodany_g = Math.round(suma.w  / liczbaDni * 10) / 10;
+  json.blonnik_g     = Math.round(suma.bl / liczbaDni * 10) / 10;
+  json.mikro = json.mikro || {};
+  for (const pole of mikro_pola) {
+    json.mikro[pole] = Math.round((suma[pole]||0) / liczbaDni * 10) / 10;
+  }
+  json._kalibracja = { skalowano: skalowanoDni, regenerowano: regenerowanoDni, korekcjaMakro: korektaMakroDni, kalibrowano: kalibrowanoDni };
+
+  return json;
+}
+
 async function wzbogacMakrami(json) {
   const mikro_pola = ['wapn_mg','zelazo_mg','magnez_mg','potas_mg','vit_c_mg','vit_a_ug','vit_d_ug','vit_b12_ug','folany_ug','cynk_mg','sod_mg','fosfor_mg','selen_ug','jod_ug','nas_g','omega3_g'];
 
@@ -2978,10 +4236,21 @@ async function wzbogacMakrami(json) {
     for (const posilek of (dzien.posilki || [])) {
       const makra = await przeliczMakraPosilku(posilek.skladniki);
       if (makra) {
-        Object.assign(posilek, makra);
-        posilek.zrodlo_makr = 'baza';
+        // Jeśli posiłek był obliczony przez RAG (zrodlo_makr='baza'),
+        // aktualizuj TYLKO mikroskładniki — nie nadpisuj kcal/makro które RAG już policzył
+        if (posilek.zrodlo_makr === 'baza') {
+          for (const pole of mikro_pola) {
+            if (makra[pole] !== undefined) posilek[pole] = makra[pole];
+          }
+          // Zaktualizuj też błonnik który nie jest mikroskładnikiem w RAG
+          if (makra.blonnik_g !== undefined) posilek.blonnik_g = makra.blonnik_g;
+        } else {
+          // Posiłek nie był przez RAG — aktualizuj wszystko
+          Object.assign(posilek, makra);
+          posilek.zrodlo_makr = 'baza';
+        }
       } else {
-        posilek.zrodlo_makr = 'ai';
+        if (!posilek.zrodlo_makr) posilek.zrodlo_makr = 'ai';
       }
     }
   }
@@ -3108,15 +4377,26 @@ function renderMikroPanel(json, params) {
 
     if (cls !== 'ok') {
       const badgeCls = cls === 'warn' ? 'bad' : 'warn';
-      badgesHtml += `<span class="mikro-badge ${badgeCls}">${d.label}: ${Math.round(pct)}% normy</span>`;
+      badgesHtml += `<span class="mikro-badge ${badgeCls}">${d.label}: orientacyjnie ${Math.round(pct)}% normy</span>`;
     }
   });
 
+  // Ostrzeżenie o wit. D — w Polsce niedobór dotyczy >90% populacji
+  const witD = r(m.vit_d_ug||0);
+  const witDNorma = n.vit_d || 15;
+  const witDPct = witDNorma > 0 ? Math.round((witD / witDNorma) * 100) : 0;
+  const witDAlert = witDPct < 50 ? `
+    <div style="background:rgba(251,146,60,0.1);border:1px solid rgba(251,146,60,0.3);border-radius:10px;padding:10px 12px;margin-top:10px;font-size:11px;line-height:1.6;color:#fdba74;">
+      <strong>☀️ Niedobór witaminy D (${witD}µg / ${Math.round(witDPct)}% normy)</strong><br>
+      W Polsce niedobór wit. D dotyczy ponad 90% populacji, szczególnie od października do marca.
+      Rozważ suplementację <strong>2000–4000 IU wit. D3 dziennie</strong> (skonsultuj z lekarzem).
+    </div>` : '';
+
   const tytul = (badCount === 0 && warnCount === 0)
-    ? '✅ Spełnia normy IŻŻ/WHO'
+    ? '✅ Orientacyjnie pokrywa normy IŻŻ/WHO'
     : badCount > 0
-      ? `⚠️ Wymaga uzupełnienia (${badCount} skł.)`
-      : '📊 Prawie norma IŻŻ';
+      ? `⚠️ Możliwe niedobory (${badCount} skł.) — skonsultuj z dietetykiem`
+      : '📊 Większość norm orientacyjnie pokryta';
 
   const igBadge = igDnia > 0
     ? `<div style="margin-bottom:12px;padding:8px 12px;background:rgba(124,106,247,0.1);border-radius:10px;border:1px solid var(--border);">
@@ -3126,10 +4406,11 @@ function renderMikroPanel(json, params) {
 
   panel.innerHTML = `
     <div class="mikro-title">🔬 Analiza mikroskładników — ${tytul}</div>
-    <div style="font-size:10px;color:var(--text2);margin-bottom:10px;opacity:0.6">Wartości średnie / dzień · Linia = 100% normy IŻŻ/WHO · Najedź na nazwę = info</div>
+    <div style="font-size:10px;color:var(--text2);margin-bottom:10px;opacity:0.6">Wartości orientacyjne / dzień · Linia = 100% normy IŻŻ/WHO · Dane z bazy IŻŻ/USDA · Najedź = info</div>
     ${igBadge}
     ${rowsHtml}
-    ${badgesHtml ? `<div class="mikro-status-row">${badgesHtml}</div>` : '<div class="mikro-status-row"><span class="mikro-badge ok">✅ Wszystkie normy spełnione</span></div>'}`;
+    ${badgesHtml ? `<div class="mikro-status-row">${badgesHtml}</div>` : '<div class="mikro-status-row"><span class="mikro-badge ok">✅ Wszystkie normy spełnione</span></div>'}
+    ${witDAlert}`;
 
   return panel;
 }

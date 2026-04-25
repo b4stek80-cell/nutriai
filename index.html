@@ -767,7 +767,28 @@
   .saved-item:active { transform: scale(0.98); }
   .saved-name { font-weight: 500; font-size: 15px; margin-bottom: 4px; }
   .saved-meta { font-size: 12px; color: var(--text2); }
+
+  /* AUTH */
+  #auth-area { display: flex; align-items: center; }
+  .auth-btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 7px 11px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: opacity 0.2s;
+    white-space: nowrap;
+  }
+  .auth-btn:hover { opacity: 0.85; }
+  .auth-btn-sm { padding: 5px 9px; background: var(--bg3); }
+  #user-info { display: none; align-items: center; gap: 6px; }
+  .user-avatar { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent); }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
 <body>
 
@@ -775,6 +796,13 @@
   <div>
     <div class="header-title">NutriAI</div>
     <div class="header-sub">Generator jadłospisów</div>
+  </div>
+  <div id="auth-area">
+    <button id="btn-login" class="auth-btn" onclick="handleLogin()">Zaloguj</button>
+    <div id="user-info">
+      <img id="user-avatar" class="user-avatar" src="" alt="avatar">
+      <button class="auth-btn auth-btn-sm" onclick="handleLogout()">Wyloguj</button>
+    </div>
   </div>
 </div>
 
@@ -1105,8 +1133,56 @@
 // Zaokrąglenie do 1 miejsca po przecinku — eliminuje błędy zmiennoprzecinkowe JS
 const r1 = v => Math.round((v||0) * 10) / 10;
 
-const BACKEND_URL = 'https://nutriai-backend-production-8991.up.railway.app'; // URL backendu — ustaw przed deploy
-const apiKey = ''; // klucz użytkownika — nieużywany gdy backend aktywny
+const BACKEND_URL = 'https://nutriai-backend-production-8991.up.railway.app';
+const apiKey = '';
+
+// ─── Supabase Auth ─────────────────────────────────────────────────────────
+const SUPABASE_URL = 'WSTAW_SUPABASE_URL';       // np. https://abcxyz.supabase.co
+const SUPABASE_ANON_KEY = 'WSTAW_SUPABASE_ANON_KEY'; // z Supabase > Settings > API
+
+const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let currentUser = null;
+let currentSession = null;
+
+_supabase.auth.onAuthStateChange((_event, session) => {
+  currentSession = session;
+  currentUser = session?.user ?? null;
+  updateAuthUI();
+});
+
+function updateAuthUI() {
+  const btnLogin = document.getElementById('btn-login');
+  const userInfo = document.getElementById('user-info');
+  const avatar = document.getElementById('user-avatar');
+  if (currentUser) {
+    btnLogin.style.display = 'none';
+    userInfo.style.display = 'flex';
+    avatar.src = currentUser.user_metadata?.avatar_url || '';
+    avatar.title = currentUser.email || '';
+  } else {
+    btnLogin.style.display = '';
+    userInfo.style.display = 'none';
+  }
+}
+
+async function handleLogin() {
+  await _supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: window.location.href }
+  });
+}
+
+async function handleLogout() {
+  await _supabase.auth.signOut();
+}
+
+function getAuthHeaders() {
+  return currentSession?.access_token
+    ? { 'Authorization': `Bearer ${currentSession.access_token}` }
+    : {};
+}
+// ───────────────────────────────────────────────────────────────────────────
+
 let currentResult = null;
 
 // Init
@@ -1391,7 +1467,7 @@ async function generate() {
           : JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: temperatura, maxOutputTokens: 8192, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } } });
         const res = await fetch(_endpoint, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
           body: _body
         });
 
@@ -2748,7 +2824,7 @@ Zwróć TYLKO JSON:
     const res = await fetch(
       BACKEND_URL ? `${BACKEND_URL}/query` : `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
-        method:'POST', headers:{'Content-Type':'application/json'},
+        method:'POST', headers:{'Content-Type':'application/json',...getAuthHeaders()},
         body: JSON.stringify({
           contents:[{parts:[{text:prompt}]}],
           generationConfig:{temperature:0.6,maxOutputTokens:1024,responseMimeType:'application/json',thinkingConfig:{thinkingBudget:0}}
@@ -2883,7 +2959,7 @@ Odpowiedź MAX 100 słów. Styl: profesjonalny, praktyczny, bez ogólników.`;
   try {
     const res = await fetch(
       BACKEND_URL ? `${BACKEND_URL}/query` : `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-      { method:'POST', headers:{'Content-Type':'application/json'},
+      { method:'POST', headers:{'Content-Type':'application/json',...getAuthHeaders()},
         body: JSON.stringify({ contents:[{parts:[{text:prompt}]}],
           generationConfig:{ temperature:0.3, maxOutputTokens:300,
             thinkingConfig:{thinkingBudget:0} }}) }
@@ -3508,7 +3584,7 @@ Realne wartości USDA/IŻŻ. ig=0 dla mięs/ryb/nabiału. Liczby bez jednostek.`
           BACKEND_URL ? `${BACKEND_URL}/query` : `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
           {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
             body: JSON.stringify({
               contents: [{ parts: [{ text: prompt }] }],
               generationConfig: {

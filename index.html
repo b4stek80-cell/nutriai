@@ -2845,7 +2845,7 @@ function exportToFile() {
   const wskazowkiHtml = (j.wskazowki||[]).map(w => `<div class="tip">💡 ${w}</div>`).join('');
 
   // Sekcja mikroskładników do wydruku
-  const n = getNormy(params.gender, params.age);
+  const n = getNormy(params.gender, params.age, params.disease);
   const m = j.mikro || {};
   const r2 = v => Math.round(v*10)/10;
   const mikroDane = [
@@ -3690,7 +3690,7 @@ async function ocenJadlospisAI(btn) {
 
   const j = currentResult.json;
   const params = currentResult.params || {};
-  const n = getNormy(params.gender, params.age);
+  const n = getNormy(params.gender, params.age, params.disease);
   const m = j.mikro || {};
 
   const tluszczMin = Math.round((params.doceloweKcal||j.kcal_dziennie) * 0.25 / 9);
@@ -5186,7 +5186,7 @@ async function wzbogacMakrami(json) {
 }
 
 // Normy dzienne IŻŻ
-function getNormy(gender, age) {
+function getNormy(gender, age, disease) {
   const k = (gender === 'kobieta');
   const mode = getChipVal('modeChips') || 'standard';
   const ciaza = mode === 'ciaza';
@@ -5221,7 +5221,7 @@ function getNormy(gender, age) {
 
 // Panel mikroskładników z wykresami słupkowymi i normami IŻŻ
 function renderMikroPanel(json, params) {
-  const n = getNormy(params.gender, params.age);
+  const n = getNormy(params.gender, params.age, params.disease);
   const m = json.mikro || {};
   const r = v => Math.round(v * 10) / 10;
 

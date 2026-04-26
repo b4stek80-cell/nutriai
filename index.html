@@ -797,12 +797,12 @@
     <div class="header-title">jedzAI</div>
     <div class="header-sub">Generator Planów Żywieniowych</div>
   </div>
-  <div id="auth-area">
+  <div id="auth-area" style="display:flex;align-items:center;gap:8px;">
+    <button id="btnUpgrade" onclick="pokazModalPremium()" style="font-size:11px;padding:4px 12px;background:linear-gradient(135deg,#7c6af7,#a78bfa);color:#fff;border:none;border-radius:14px;cursor:pointer;font-weight:600;white-space:nowrap;">⭐ Upgrade</button>
     <button id="btn-login" class="auth-btn" onclick="handleLogin()">Zaloguj</button>
     <div id="user-info">
       <img id="user-avatar" class="user-avatar" src="" alt="avatar">
       <span id="premiumBadge" style="display:none;font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(124,106,247,0.2);color:#a78bfa;font-weight:700;">⭐ Premium</span>
-      <button id="btnUpgrade" onclick="pokazModalPremium()" style="font-size:11px;padding:4px 10px;background:linear-gradient(135deg,#7c6af7,#a78bfa);color:#fff;border:none;border-radius:14px;cursor:pointer;font-weight:600;">⭐ Upgrade</button>
       <button class="auth-btn auth-btn-sm" onclick="handleLogout()">Wyloguj</button>
     </div>
   </div>
@@ -1181,10 +1181,17 @@ let isPremium = false;
 _supabase.auth.onAuthStateChange((_event, session) => {
   currentSession = session;
   currentUser = session?.user ?? null;
-  isPremium = false; // reset przy każdej zmianie auth
+  isPremium = false;
   aktualizujLimitInfo();
-  if (currentUser) pobierzStatusSubskrypcji();
   updateAuthUI();
+  if (currentUser) {
+    pobierzStatusSubskrypcji();
+    // Po powrocie z logowania — dokończ checkout jeśli był pending
+    if (sessionStorage.getItem('nutriai_pending_checkout')) {
+      sessionStorage.removeItem('nutriai_pending_checkout');
+      setTimeout(rozpocznijPlatnosc, 800);
+    }
+  }
 });
 
 function updateAuthUI() {
@@ -1338,14 +1345,13 @@ function zamknijModalPremium() {
 
 async function rozpocznijPlatnosc() {
   if (!currentUser) {
-    zamknijModalPremium();
-    showToast('⚠️ Zaloguj się żeby kupić Premium');
+    sessionStorage.setItem('nutriai_pending_checkout', '1');
+    showToast('⚠️ Zaloguj się — zaraz wrócimy do płatności');
     await handleLogin();
     return;
   }
   const btn = document.getElementById('btnKupPremium');
-  btn.textContent = 'Przekierowuję do Stripe...';
-  btn.disabled = true;
+  if (btn) { btn.textContent = 'Przekierowuję do Stripe...'; btn.disabled = true; }
   try {
     const res = await fetch(`${BACKEND_URL}/create-checkout`, {
       method: 'POST',
@@ -1356,13 +1362,11 @@ async function rozpocznijPlatnosc() {
       window.location.href = data.url;
     } else {
       showToast('❌ Błąd płatności: ' + (data.error || 'spróbuj ponownie'));
-      btn.textContent = 'Kup Premium';
-      btn.disabled = false;
+      if (btn) { btn.textContent = 'Kup Premium'; btn.disabled = false; }
     }
   } catch (e) {
-    showToast('❌ Błąd połączenia');
-    btn.textContent = 'Kup Premium';
-    btn.disabled = false;
+    showToast('❌ Błąd połączenia: ' + e.message);
+    if (btn) { btn.textContent = 'Kup Premium'; btn.disabled = false; }
   }
 }
 

@@ -801,6 +801,7 @@
     <button id="btn-login" class="auth-btn" onclick="handleLogin()">Zaloguj</button>
     <div id="user-info">
       <img id="user-avatar" class="user-avatar" src="" alt="avatar">
+      <span id="premiumBadge" style="display:none;font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(124,106,247,0.2);color:#a78bfa;font-weight:700;">⭐ Premium</span>
       <button class="auth-btn auth-btn-sm" onclick="handleLogout()">Wyloguj</button>
     </div>
   </div>
@@ -897,11 +898,6 @@
     <div class="chip" data-val="5">5 posiłków</div>
   </div>
 
-  <div class="section-label">Dla kogo (opcjonalnie)</div>
-  <div class="input-group">
-    <input type="text" id="pacjentNazwa" placeholder="np. Jan Kowalski — pojawi się w eksporcie" maxlength="60" autocomplete="name">
-  </div>
-
   <div class="section-label">Alergie / wykluczenia produktów</div>
   <div class="input-group">
     <textarea id="allergies" placeholder="np. gluten, laktoza, orzechy, jajka..."></textarea>
@@ -971,9 +967,6 @@
   <button class="gen-btn" id="genBtn" onclick="generate()">
     ✨ Generuj mój plan żywieniowy
   </button>
-  <div id="limitInfo" style="text-align:center;font-size:11px;color:var(--text2);margin-top:8px;line-height:1.6;">
-    <span id="limitTekst">🎁 5 jadłospisów dziennie za darmo · Limit odnawia się o północy</span>
-  </div>
 </div>
 
 <!-- RESULT SCREEN -->
@@ -1135,6 +1128,27 @@
 
 <!-- KEY MODAL -->
 
+<!-- PREMIUM MODAL -->
+<div id="premiumModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.7);backdrop-filter:blur(6px);align-items:center;justify-content:center;">
+  <div style="background:#1e2535;border:1px solid rgba(124,106,247,0.3);border-radius:20px;padding:36px 32px;max-width:420px;width:90%;text-align:center;box-shadow:0 24px 80px rgba(0,0,0,0.5);">
+    <div style="font-size:42px;margin-bottom:12px;">⭐</div>
+    <h2 style="font-size:22px;font-weight:800;margin-bottom:10px;">Wyczerpałeś dzienny limit</h2>
+    <p style="color:#94a3b8;font-size:14px;margin-bottom:24px;">Bezpłatny plan umożliwia generowanie <strong style="color:#e2e8f0">5 jadłospisów dziennie</strong>. Wróć jutro lub przejdź na Premium.</p>
+    <div style="background:rgba(124,106,247,0.08);border:1px solid rgba(124,106,247,0.2);border-radius:14px;padding:20px;margin-bottom:24px;text-align:left;">
+      <div style="font-size:13px;font-weight:700;color:#a78bfa;margin-bottom:12px;">✨ Plan Premium — 19 zł/mies</div>
+      <div style="display:flex;flex-direction:column;gap:8px;font-size:13px;">
+        <div>✓ <strong>Bez limitu</strong> jadłospisów</div>
+        <div>✓ Wszystkie funkcje AI</div>
+        <div>✓ Minerały i witaminy per posiłek</div>
+        <div>✓ Anuluj kiedy chcesz</div>
+      </div>
+      <div style="margin-top:16px;font-size:28px;font-weight:800;">19 <span style="font-size:16px;font-weight:500;color:#94a3b8">zł/mies</span></div>
+    </div>
+    <button id="btnKupPremium" onclick="rozpocznijPlatnosc()" style="width:100%;padding:14px;background:#7c6af7;color:#fff;border:none;border-radius:24px;font-size:16px;font-weight:700;cursor:pointer;margin-bottom:10px;">Kup Premium</button>
+    <button onclick="zamknijModalPremium()" style="width:100%;padding:11px;background:transparent;color:#94a3b8;border:1px solid rgba(255,255,255,0.1);border-radius:24px;font-size:14px;cursor:pointer;">Może później</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1152,17 +1166,83 @@ const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let currentUser = null;
 let currentSession = null;
 
-// Status subskrypcji — musi być przed onAuthStateChange
 let isPremium = false;
 
 _supabase.auth.onAuthStateChange((_event, session) => {
   currentSession = session;
   currentUser = session?.user ?? null;
-  isPremium = false; // reset przy każdej zmianie auth
-  aktualizujLimitInfo();
-  if (currentUser) pobierzStatusSubskrypcji();
   updateAuthUI();
+  if (currentUser) pobierzStatusSubskrypcji();
 });
+
+async function pobierzStatusSubskrypcji() {
+  try {
+    const res = await fetch(`${BACKEND_URL}/me`, {
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    isPremium = data.is_premium || false;
+    updatePremiumUI();
+  } catch (_) {}
+}
+
+function updatePremiumUI() {
+  const badge = document.getElementById('premiumBadge');
+  if (badge) badge.style.display = isPremium ? 'inline-block' : 'none';
+}
+
+function pokazModalPremium() {
+  const modal = document.getElementById('premiumModal');
+  modal.style.display = 'flex';
+}
+
+function zamknijModalPremium() {
+  document.getElementById('premiumModal').style.display = 'none';
+}
+
+async function rozpocznijPlatnosc() {
+  if (!currentUser) {
+    zamknijModalPremium();
+    showToast('⚠️ Zaloguj się żeby kupić Premium');
+    await handleLogin();
+    return;
+  }
+  const btn = document.getElementById('btnKupPremium');
+  btn.textContent = 'Przekierowuję do Stripe...';
+  btn.disabled = true;
+  try {
+    const res = await fetch(`${BACKEND_URL}/create-checkout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }
+    });
+    const data = await res.json();
+    if (data.url) {
+      window.location.href = data.url;
+    } else {
+      showToast('❌ Błąd płatności: ' + (data.error || 'spróbuj ponownie'));
+      btn.textContent = 'Kup Premium';
+      btn.disabled = false;
+    }
+  } catch (e) {
+    showToast('❌ Błąd połączenia');
+    btn.textContent = 'Kup Premium';
+    btn.disabled = false;
+  }
+}
+
+// Obsługa powrotu ze Stripe
+(function handleStripeReturn() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('payment') === 'success') {
+    showToast('🎉 Plan Premium aktywowany!');
+    pobierzStatusSubskrypcji();
+    window.history.replaceState({}, '', window.location.pathname);
+  } else if (params.get('payment') === 'cancel') {
+    showToast('Płatność anulowana');
+    window.history.replaceState({}, '', window.location.pathname);
+  }
+})();
 
 function updateAuthUI() {
   const btnLogin = document.getElementById('btn-login');
@@ -1231,74 +1311,11 @@ let currentResult = null;
 // Init
 updateKeyBtn();
 initChips();
-aktualizujLimitInfo();
 loadSaved();
 loadDiary();
 setTimeout(aktualizujStatystykiBazy, 500);
 
 
-
-// Status subskrypcji — pobierany z backendu po zalogowaniu
-async function pobierzStatusSubskrypcji() {
-  if (!BACKEND_URL || !currentSession?.access_token) return;
-  try {
-    const res = await fetch(`${BACKEND_URL}/me`, {
-      headers: {
-        'Authorization': `Bearer ${currentSession.access_token}`,
-        'X-User-Email': currentUser?.email || ''
-      }
-    });
-    if (!res.ok) return;
-    const data = await res.json();
-    isPremium = data.is_premium === true;
-    aktualizujLimitInfo();
-  } catch(e) {
-    console.warn('Nie można pobrać statusu subskrypcji:', e.message);
-  }
-}
-
-// Lokalny licznik generacji (synchronizowany z datą)
-function getLimitInfo() {
-  const dzis = new Date().toDateString();
-  const zapisany = localStorage.getItem('nutriai_gen_date');
-  if (zapisany !== dzis) {
-    localStorage.setItem('nutriai_gen_date', dzis);
-    localStorage.setItem('nutriai_gen_count', '0');
-  }
-  const count = parseInt(localStorage.getItem('nutriai_gen_count') || '0');
-  return { count, pozostalo: Math.max(0, 5 - count) };
-}
-
-function aktualizujLimitInfo() {
-  const el = document.getElementById('limitTekst');
-  if (!el) return;
-
-  // Premium — bez limitu
-  if (isPremium) {
-    el.innerHTML = '✨ Plan Premium · Nielimitowane jadłospisy';
-    el.style.color = '#a78bfa';
-    return;
-  }
-
-  // Free — licznik dzienny
-  const { pozostalo } = getLimitInfo();
-  if (pozostalo === 0) {
-    el.innerHTML = '⏰ Dzienny limit wyczerpany · Odnowi się o północy';
-    el.style.color = '#fb923c';
-  } else if (pozostalo <= 2) {
-    el.innerHTML = `⚡ Pozostało <strong style="color:#fb923c">${pozostalo}</strong> z 5 darmowych jadłospisów dziś`;
-    el.style.color = 'var(--text2)';
-  } else {
-    el.innerHTML = `🎁 Pozostało <strong style="color:var(--green)">${pozostalo}</strong> z 5 darmowych jadłospisów dziś`;
-    el.style.color = 'var(--text2)';
-  }
-}
-
-function zwiększLicznikGeneracji() {
-  const count = parseInt(localStorage.getItem('nutriai_gen_count') || '0');
-  localStorage.setItem('nutriai_gen_count', String(count + 1));
-  aktualizujLimitInfo();
-}
 
 function updateKeyBtn() {}
 
@@ -1663,9 +1680,15 @@ async function generate() {
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
           const msg = err.error || err.error?.message || `HTTP ${res.status}`;
-          // 429 od własnego backendu = dzienny limit — nie ponawiaj
-          const isDailyLimit = res.status === 429 && msg.toString().includes('limit');
-          if (!isDailyLimit && (res.status === 503 || res.status === 429 || res.status === 500) && attempt < MAX_RETRIES) {
+          // 429 od własnego backendu = dzienny limit — pokaż modal Premium
+          if (res.status === 429) {
+            clearInterval(msgInterval);
+            document.getElementById('loader').style.display = 'none';
+            pokazModalPremium();
+            throw new Error('Dzienny limit jadłospisów wyczerpany.');
+          }
+          const isDailyLimit = false;
+          if (!isDailyLimit && (res.status === 503 || res.status === 500) && attempt < MAX_RETRIES) {
             document.getElementById('loaderText').textContent =
               `Serwer zajęty — próba ${attempt+1}/${MAX_RETRIES}...`;
             await new Promise(r => setTimeout(r, RETRY_DELAY * attempt));
@@ -1853,18 +1876,6 @@ ZASADY:
 5. Różnorodność produktów przez cały tydzień
 6. ZAKAZ dań złożonych — NIE używaj: bigos, pierogi, żurek, kotlet schabowy, golonka, zupa, casserole, gulasz ani żadnych innych gotowych potraw. Każdy posiłek = lista PODSTAWOWYCH składników (np. zamiast "bigos" → kapusta kiszona + wieprzowina + kiełbasa + cebula)
 ${trybOpis ? '7. Bezwzględnie stosuj wytyczne kliniczne przy doborze składników.' : ''}
-
-ZŁOTE ZASADY DIETETYCZNE (IŻŻ / WHO / Piramida Żywienia):
-• Warzywa lub owoce w KAŻDYM posiłku — min. 400g łącznie dziennie, warzywa > owoce
-• Różnokolorowe warzywa przez tydzień (zielone, czerwone, pomarańczowe, fioletowe)
-• Produkty zbożowe PEŁNOZIARNISTE — chleb graham/żytni, ryż brązowy, kasza, makaron pełnoziarnisty
-• Ryby min. 2x w tygodniu (łosoś, dorsz, makrela, pstrąg, tuńczyk)
-• Czerwone mięso max 2x w tygodniu — preferuj drób, rośliny strączkowe, jajka
-• Zdrowe tłuszcze — oliwa z oliwek, orzechy, awokado zamiast tłuszczów nasyconych
-• Nabiał fermentowany — jogurt, kefir, skyr jako źródło wapnia i probiotyków
-• Strączkowe min. 3x w tygodniu — soczewica, ciecierzyca, fasola, tofu
-• Ogranicz sól — nie dodawaj osobno, używaj ziół i przypraw
-• Zróżnicowanie białka — naprzemiennie: mięso, ryby, jajka, rośliny strączkowe
 
 Zwróć TYLKO JSON:
 {"wskazowki":["string","string","string","string","string"],"dni":[{"dzien":"string","posilki":[{"pora":"string","nazwa":"string","skladniki":[{"nazwa":"nazwa z bazy IŻŻ","procent_kcal":number}]}]}]}
@@ -2087,12 +2098,10 @@ Nazwy posiłków max 5 słów. 5 wskazówek żywieniowych.`;
                 uzytkoReczne: uzytkoReczne || false,
                 bmi: Math.round(bmi*10)/10,
                 deficyt: korekta,
-                doceloweBialko, doceloweTluszcze, doceloweWegl,
-                pacjentNazwa: document.getElementById('pacjentNazwa')?.value?.trim() || '' },
+                doceloweBialko, doceloweTluszcze, doceloweWegl },
       date: new Date().toLocaleDateString('pl')
     };
     renderResult(jsonWeryfikowany);
-    zwiększLicznikGeneracji();
 
   } catch(e) {
     clearInterval(msgInterval);
@@ -2391,17 +2400,6 @@ function renderResult(json) {
     header.onclick = () => card.classList.toggle('open');
     card.appendChild(header);
 
-    // Funkcja aktualizacji headera dnia po wymianie posiłku
-    card._aktualizujHeader = () => {
-      const nowyTotal = day.posilki.reduce((s,m) => s+(m.kcal||0), 0);
-      const nowyOK = kcalMinP === 0 || (nowyTotal >= kcalMinP && nowyTotal <= kcalMaxP);
-      const nowyBadge = params.doceloweKcal
-        ? `<span style="font-size:10px;padding:2px 8px;border-radius:10px;margin-left:6px;font-weight:600;background:${nowyOK?'rgba(52,211,153,0.2)':'rgba(251,146,60,0.2)'};color:${nowyOK?'#34d399':'#fb923c'}">${nowyOK?'✓':'⚠'} ${nowyTotal} kcal</span>`
-        : `<span class="day-kcal">${nowyTotal} kcal</span>`;
-      header.innerHTML = `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px"><div class="day-name">${day.dzien}</div>${nowyBadge}</div><span class="day-chevron">▼</span>`;
-      header.onclick = () => card.classList.toggle('open');
-    };
-
     const body = document.createElement('div');
     body.className = 'day-body';
 
@@ -2448,13 +2446,12 @@ function renderResult(json) {
 
       meal.innerHTML = html;
 
-      // Przycisk "Wymień posiłek" z limitem 3 wymian
+      // Przycisk "Wymień posiłek"
       const swapBtn = document.createElement('button');
       swapBtn.className = 'swap-btn';
       swapBtn.innerHTML = '🔄 Wymień posiłek';
       swapBtn.title = 'Wygeneruj inny posiłek o tych samych makrach';
-      swapBtn.dataset.swapCount = '0';
-      swapBtn.onclick = () => wymienPosilek(m, day, swapBtn, meal, json, params, card);
+      swapBtn.onclick = () => wymienPosilek(m, day, swapBtn, meal, json, params);
       meal.appendChild(swapBtn);
 
       // Przyciski przelicznika porcji
@@ -2471,7 +2468,7 @@ function renderResult(json) {
       meal.appendChild(porcjeRow);
 
       // Przycisk "Więcej minerałów" per posiłek
-      const mikroPolaPosilku = ['wapn_mg','fosfor_mg','magnez_mg','potas_mg','sod_mg','zelazo_mg','cynk_mg','omega3_g','vit_c_mg','vit_d_ug','vit_b12_ug','folany_ug','selen_ug','jod_ug','nas_g'];
+      const mikroPolaPosilku = ['wapn_mg','fosfor_mg','magnez_mg','potas_mg','sod_mg','zelazo_mg','cynk_mg','omega3_g'];
       const maMikro = mikroPolaPosilku.some(f => (m[f] || 0) > 0);
       if (maMikro) {
         const r1m = v => Math.round(v * 10) / 10;
@@ -2480,46 +2477,26 @@ function renderResult(json) {
 
         const mikroBtnP = document.createElement('button');
         mikroBtnP.style.cssText = 'width:100%;margin-top:5px;padding:4px;background:rgba(96,165,250,0.06);border:1px solid rgba(96,165,250,0.15);border-radius:8px;color:var(--accent2);font-size:10px;cursor:pointer;text-align:left;';
-        mikroBtnP.innerHTML = '🔬 Składniki mineralne i witaminy ▾';
+        mikroBtnP.innerHTML = '🔬 Więcej minerałów ▾';
 
         const mikroPanelP = document.createElement('div');
-        mikroPanelP.style.cssText = 'display:none;margin-top:4px;padding:10px;background:var(--bg3);border-radius:8px;font-size:10px;';
-
-        // Pomocnik do tworzenia badge
-        const badge = (label, val, unit, bg, color) =>
-          val > 0 ? `<span style="padding:2px 7px;border-radius:12px;background:${bg};color:${color}">${label}: ${r1m(val)}${unit}</span>` : '';
-
-        mikroPanelP.innerHTML = `
-          <div style="font-size:9px;color:var(--text2);font-weight:600;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.05em;">🧱 Minerały</div>
-          <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;">
-            ${badge('Ca',  m.wapn_mg,   'mg', 'rgba(52,211,153,0.1)',  '#6ee7b7')}
-            ${badge('P',   m.fosfor_mg, 'mg', 'rgba(52,211,153,0.1)',  '#6ee7b7')}
-            ${caP ? `<span style="padding:2px 7px;border-radius:12px;background:rgba(52,211,153,0.08);color:${caPColor};font-weight:600">Ca:P = ${caP}</span>` : ''}
-            ${badge('Mg',  m.magnez_mg, 'mg', 'rgba(124,106,247,0.1)', '#a78bfa')}
-            ${badge('K',   m.potas_mg,  'mg', 'rgba(124,106,247,0.1)', '#a78bfa')}
-            ${badge('Na',  m.sod_mg,    'mg', 'rgba(251,146,60,0.1)',  '#fb923c')}
-            ${badge('Fe',  m.zelazo_mg, 'mg', 'rgba(251,146,60,0.1)',  '#fb923c')}
-            ${badge('Zn',  m.cynk_mg,   'mg', 'rgba(251,146,60,0.1)',  '#fb923c')}
-            ${badge('Se',  m.selen_ug,  'µg', 'rgba(251,146,60,0.1)',  '#fb923c')}
-            ${badge('I',   m.jod_ug,    'µg', 'rgba(251,146,60,0.1)',  '#fb923c')}
-          </div>
-          <div style="font-size:9px;color:var(--text2);font-weight:600;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.05em;">💊 Witaminy</div>
-          <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;">
-            ${badge('Wit.C',   m.vit_c_mg,  'mg', 'rgba(250,204,21,0.1)',  '#fbbf24')}
-            ${badge('Wit.D',   m.vit_d_ug,  'µg', 'rgba(250,204,21,0.1)',  '#fbbf24')}
-            ${badge('Wit.B12', m.vit_b12_ug,'µg', 'rgba(250,204,21,0.1)',  '#fbbf24')}
-            ${badge('Fol',     m.folany_ug, 'µg', 'rgba(250,204,21,0.1)',  '#fbbf24')}
-          </div>
-          <div style="font-size:9px;color:var(--text2);font-weight:600;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.05em;">🫀 Tłuszcze</div>
-          <div style="display:flex;flex-wrap:wrap;gap:5px;">
-            ${badge('Omega-3', m.omega3_g, 'g', 'rgba(96,165,250,0.1)', '#60a5fa')}
-            ${badge('Nas',     m.nas_g,    'g', 'rgba(251,146,60,0.1)', '#fb923c')}
-          </div>`;
+        mikroPanelP.style.cssText = 'display:none;margin-top:4px;padding:8px;background:var(--bg3);border-radius:8px;font-size:10px;';
+        mikroPanelP.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:5px;">
+          ${m.wapn_mg   > 0 ? `<span style="padding:2px 7px;border-radius:12px;background:rgba(52,211,153,0.1);color:#6ee7b7">Ca: ${Math.round(m.wapn_mg)}mg</span>` : ''}
+          ${m.fosfor_mg > 0 ? `<span style="padding:2px 7px;border-radius:12px;background:rgba(52,211,153,0.1);color:#6ee7b7">P: ${Math.round(m.fosfor_mg)}mg</span>` : ''}
+          ${caP ? `<span style="padding:2px 7px;border-radius:12px;background:rgba(52,211,153,0.08);color:${caPColor};font-weight:600">Ca:P = ${caP}</span>` : ''}
+          ${m.magnez_mg > 0 ? `<span style="padding:2px 7px;border-radius:12px;background:rgba(124,106,247,0.1);color:#a78bfa">Mg: ${Math.round(m.magnez_mg)}mg</span>` : ''}
+          ${m.potas_mg  > 0 ? `<span style="padding:2px 7px;border-radius:12px;background:rgba(124,106,247,0.1);color:#a78bfa">K: ${Math.round(m.potas_mg)}mg</span>` : ''}
+          ${m.sod_mg    > 0 ? `<span style="padding:2px 7px;border-radius:12px;background:rgba(251,146,60,0.1);color:#fb923c">Na: ${Math.round(m.sod_mg)}mg</span>` : ''}
+          ${m.zelazo_mg > 0 ? `<span style="padding:2px 7px;border-radius:12px;background:rgba(251,146,60,0.1);color:#fb923c">Fe: ${r1m(m.zelazo_mg)}mg</span>` : ''}
+          ${m.cynk_mg   > 0 ? `<span style="padding:2px 7px;border-radius:12px;background:rgba(251,146,60,0.1);color:#fb923c">Zn: ${r1m(m.cynk_mg)}mg</span>` : ''}
+          ${m.omega3_g  > 0 ? `<span style="padding:2px 7px;border-radius:12px;background:rgba(96,165,250,0.1);color:#60a5fa">ω-3: ${r1m(m.omega3_g)}g</span>` : ''}
+        </div>`;
 
         mikroBtnP.onclick = () => {
           const open = mikroPanelP.style.display !== 'none';
           mikroPanelP.style.display = open ? 'none' : 'block';
-          mikroBtnP.innerHTML = `🔬 Składniki mineralne i witaminy ${open ? '▾' : '▴'}`;
+          mikroBtnP.innerHTML = `🔬 Więcej minerałów ${open ? '▾' : '▴'}`;
         };
 
         meal.appendChild(mikroBtnP);
@@ -2715,196 +2692,84 @@ function exportToFile() {
     </tr>`;
   }).join('');
 
-  const pacjent = params.pacjentNazwa || '';
-  const aktywnosc = params.activity || '';
-
   const html = `<!DOCTYPE html>
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NutriAI — Plan Żywieniowy${pacjent ? ' · ' + pacjent : ''}</title>
+<title>NutriAI — Jadłospis ${date}</title>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: Arial, 'Segoe UI', sans-serif; max-width: 820px; margin: 0 auto; padding: 24px; color: #222; background: #fff; font-size: 13px; }
-
-  /* Pasek drukowania */
-  .print-bar { background: #f0eeff; border: 1px solid #c4b5fd; border-radius: 10px; padding: 10px 16px; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-  .print-bar span { font-size: 12px; color: #5b4dd4; }
-  .print-btn { background: #7c6af7; color: #fff; border: none; border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; }
-
-  /* Nagłówek raportu */
-  .report-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #7c6af7; padding-bottom: 16px; margin-bottom: 20px; }
-  .brand { display: flex; align-items: center; gap: 10px; }
-  .brand-logo { font-size: 28px; }
-  .brand-name { font-size: 22px; font-weight: 800; color: #7c6af7; line-height: 1; }
-  .brand-sub { font-size: 11px; color: #888; margin-top: 2px; }
-  .report-meta { text-align: right; font-size: 11px; color: #666; line-height: 1.8; }
-  .report-meta strong { color: #222; }
-
-  /* Karta pacjenta */
-  .patient-card { background: #f8f7ff; border: 1px solid #e0daff; border-radius: 10px; padding: 14px 18px; margin-bottom: 20px; display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; }
-  .patient-field { }
-  .patient-label { font-size: 9px; font-weight: 700; color: #9898b8; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 2px; }
-  .patient-value { font-size: 13px; font-weight: 600; color: #2d2d4e; }
-  .patient-name-row { grid-column: 1 / -1; border-bottom: 1px solid #e0daff; padding-bottom: 10px; margin-bottom: 4px; }
-  .patient-name-val { font-size: 16px; font-weight: 700; color: #5b4dd4; }
-
-  /* Summary makro */
-  .summary { display: grid; grid-template-columns: repeat(6,1fr); gap: 8px; background: linear-gradient(135deg,#7c6af7,#5b4dd4); border-radius: 10px; padding: 16px; margin-bottom: 20px; }
+  body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; color: #222; background: #fff; }
+  .print-bar { background: #f0eeff; border: 1px solid #c4b5fd; border-radius: 10px; padding: 12px 16px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .print-bar span { font-size: 13px; color: #5b4dd4; }
+  .print-btn { background: #7c6af7; color: #fff; border: none; border-radius: 8px; padding: 9px 18px; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .print-btn:hover { background: #5b4dd4; }
+  .header { text-align: center; border-bottom: 3px solid #7c6af7; padding-bottom: 16px; margin-bottom: 24px; }
+  .header h1 { color: #7c6af7; margin: 0 0 6px; font-size: 26px; }
+  .header p { color: #666; font-size: 13px; margin: 0; }
+  .summary { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; background: #f5f3ff; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
   .stat { text-align: center; }
-  .stat-val { font-size: 18px; font-weight: 700; color: #fff; }
-  .stat-lbl { font-size: 9px; color: rgba(255,255,255,0.7); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.05em; }
-
-  /* Mikroskładniki */
-  .mikro-section { margin-bottom: 20px; }
-  .section-title { font-size: 12px; font-weight: 700; color: #7c6af7; border-bottom: 1px solid #e8e5ff; padding-bottom: 5px; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.06em; }
+  .stat-val { font-size: 22px; font-weight: 700; color: #7c6af7; }
+  .stat-lbl { font-size: 11px; color: #888; margin-top: 2px; }
+  .mikro-section { margin-bottom: 24px; }
+  .mikro-section h3 { color: #7c6af7; font-size: 14px; margin-bottom: 8px; }
   .mikro-table { width: 100%; border-collapse: collapse; }
-  .mikro-table td { padding: 4px 8px; }
-  .mikro-table td:nth-child(2) { width: 100px; }
-
-  /* Dni i posiłki */
-  .day { border: 1px solid #e8e5ff; border-radius: 10px; margin-bottom: 14px; overflow: hidden; page-break-inside: avoid; }
-  .day-header { background: #7c6af7; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; }
-  .day-name { font-weight: 700; color: #fff; font-size: 13px; }
-  .day-kcal { font-size: 11px; color: rgba(255,255,255,0.8); background: rgba(255,255,255,0.15); padding: 2px 10px; border-radius: 10px; }
-  .day-body { padding: 10px 16px; }
-  .meal { border-bottom: 1px solid #f0eeff; padding: 8px 0; }
+  .mikro-table td:nth-child(2) { width: 120px; }
+  .day { border: 1px solid #e0e0e0; border-radius: 10px; margin-bottom: 16px; overflow: hidden; page-break-inside: avoid; }
+  .day-header { background: #f0eeff; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; }
+  .day-name { font-weight: 700; color: #7c6af7; font-size: 15px; }
+  .day-kcal { font-size: 12px; color: #888; }
+  .day-body { padding: 12px 16px; }
+  .meal { border-bottom: 1px solid #f0f0f0; padding: 10px 0; }
   .meal:last-child { border-bottom: none; }
-  .meal-time { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #7c6af7; }
-  .meal-name { font-size: 13px; font-weight: 600; margin: 3px 0 5px; }
-  .ingredients { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 6px; }
-  .ing { font-size: 10px; padding: 1px 7px; border: 1px solid #e0e0f0; border-radius: 20px; color: #555; background: #fafafa; }
-  .macros { display: flex; gap: 6px; flex-wrap: wrap; }
-  .macros span { font-size: 10px; padding: 1px 7px; border-radius: 20px; background: #f0eeff; color: #7c6af7; }
+  .meal-time { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #7c6af7; }
+  .meal-name { font-size: 14px; font-weight: 600; margin: 3px 0; }
+  .ingredients { display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 0; }
+  .ing { font-size: 11px; padding: 2px 8px; border: 1px solid #e0e0e0; border-radius: 20px; color: #555; background: #fafafa; }
+  .macros { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 5px; }
+  .macros span { font-size: 11px; padding: 2px 8px; border-radius: 20px; background: #f0eeff; color: #7c6af7; }
   .macros span.p { background: #e8faf3; color: #1a7a52; }
   .macros span.f { background: #fff3eb; color: #b45309; }
-  .macros span.pct { background: #fafafa; color: #999; }
-
-  /* Ocena AI */
-  .ai-ocena { background: linear-gradient(135deg,#f5f3ff,#f0fdf4); border: 1px solid #c4b5fd; border-radius: 10px; padding: 14px 16px; margin-bottom: 18px; }
-  .ai-ocena h3 { color: #7c6af7; font-size: 13px; margin-bottom: 8px; }
+  .ai-ocena { background: linear-gradient(135deg,#f5f3ff,#f0fdf4); border: 1px solid #c4b5fd; border-radius: 10px; padding: 16px; margin-bottom: 20px; }
+  .ai-ocena h3 { color: #7c6af7; font-size: 14px; margin-bottom: 10px; }
   .ai-text { font-size: 12px; color: #333; line-height: 1.8; }
-  .ai-disclaimer { font-size: 10px; color: #aaa; margin-top: 6px; }
-
-  /* Wskazówki */
-  .tips { margin-bottom: 20px; }
-  .tip { background: #fafafa; border-left: 3px solid #7c6af7; padding: 8px 12px; margin-bottom: 6px; font-size: 12px; color: #555; border-radius: 0 6px 6px 0; }
-
-  /* Stopka */
-  .footer { border-top: 1px solid #eee; padding-top: 14px; margin-top: 24px; display: flex; justify-content: space-between; align-items: center; font-size: 10px; color: #aaa; }
-  .footer-brand { font-weight: 600; color: #7c6af7; }
-  .disclaimer { font-size: 9px; color: #bbb; max-width: 400px; text-align: right; line-height: 1.5; }
-
+  .ai-disclaimer { font-size: 10px; color: #aaa; margin-top: 8px; }
+  .tips { margin-top: 24px; }
+  .tips h3 { color: #7c6af7; margin-bottom: 10px; }
+  .tip { background: #fafafa; border: 1px solid #e0e0e0; border-radius: 8px; padding: 10px 14px; margin-bottom: 8px; font-size: 13px; color: #555; }
+  .footer { text-align: center; margin-top: 32px; padding-top: 16px; border-top: 1px solid #eee; font-size: 11px; color: #aaa; }
   @media print {
     .print-bar { display: none; }
-    body { padding: 8mm; }
+    body { padding: 10px; }
     .day { page-break-inside: avoid; }
-    .summary { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .day-header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    @page { margin: 12mm; size: A4; }
+    @page { margin: 15mm; size: A4; }
   }
 </style>
 </head>
 <body>
-
   <div class="print-bar">
-    <span>📋 Aby zapisać jako PDF: Drukuj → "Zapisz jako PDF"</span>
+    <span>📋 Aby zapisać jako PDF: kliknij Drukuj → wybierz "Zapisz jako PDF"</span>
     <button class="print-btn" onclick="window.print()">🖨️ Drukuj / Zapisz PDF</button>
   </div>
-
-  <!-- NAGŁÓWEK RAPORTU -->
-  <div class="report-header">
-    <div class="brand">
-      <div class="brand-logo">🥗</div>
-      <div>
-        <div class="brand-name">NutriAI</div>
-        <div class="brand-sub">Generator Planów Żywieniowych</div>
-      </div>
-    </div>
-    <div class="report-meta">
-      <div>Data wygenerowania: <strong>${date}</strong></div>
-      <div>Długość planu: <strong>${j.dni?.length || 0} dni</strong></div>
-      <div>Źródło danych: <strong>IŻŻ 2017 / USDA</strong></div>
-    </div>
+  <div class="header">
+    <h1>🥗 NutriAI — Plan Żywieniowy</h1>
+    <p>Wygenerowano: ${date} &nbsp;|&nbsp; Cel: ${params.goal} &nbsp;|&nbsp; Dieta: ${params.diet} &nbsp;|&nbsp; ${params.days} dni &nbsp;|&nbsp; ${params.gender}, ${params.age} lat</p>
   </div>
-
-  <!-- KARTA PACJENTA / UŻYTKOWNIKA -->
-  <div class="patient-card">
-    ${pacjent ? `<div class="patient-field patient-name-row">
-      <div class="patient-label">Plan żywieniowy dla</div>
-      <div class="patient-name-val">${pacjent}</div>
-    </div>` : ''}
-    <div class="patient-field">
-      <div class="patient-label">Wiek</div>
-      <div class="patient-value">${params.age} lat</div>
-    </div>
-    <div class="patient-field">
-      <div class="patient-label">Płeć</div>
-      <div class="patient-value">${params.gender}</div>
-    </div>
-    <div class="patient-field">
-      <div class="patient-label">Wzrost / Waga</div>
-      <div class="patient-value">${params.height} cm / ${params.weight} kg</div>
-    </div>
-    <div class="patient-field">
-      <div class="patient-label">BMI</div>
-      <div class="patient-value">${params.bmi || Math.round(params.weight/((params.height/100)**2)*10)/10}</div>
-    </div>
-    <div class="patient-field">
-      <div class="patient-label">Cel</div>
-      <div class="patient-value">${params.goal}</div>
-    </div>
-    <div class="patient-field">
-      <div class="patient-label">Dieta</div>
-      <div class="patient-value">${params.diet}</div>
-    </div>
-    <div class="patient-field">
-      <div class="patient-label">BMR / TDEE</div>
-      <div class="patient-value">${params.bmr} / ${params.tdee} kcal</div>
-    </div>
-    <div class="patient-field">
-      <div class="patient-label">Cel kaloryczny</div>
-      <div class="patient-value" style="color:#7c6af7;font-weight:700;">${params.doceloweKcal} kcal/dzień</div>
-    </div>
-  </div>
-
-  <!-- SUMMARY MAKRO -->
   <div class="summary">
     <div class="stat"><div class="stat-val">${j.kcal_dziennie}</div><div class="stat-lbl">kcal / dzień</div></div>
     <div class="stat"><div class="stat-val">${r1(j.bialko_g)}g</div><div class="stat-lbl">Białko</div></div>
     <div class="stat"><div class="stat-val">${r1(j.tluszcze_g)}g</div><div class="stat-lbl">Tłuszcze</div></div>
     <div class="stat"><div class="stat-val">${r1(j.weglowodany_g)}g</div><div class="stat-lbl">Węglowodany</div></div>
-    <div class="stat"><div class="stat-val">${r1(j.blonnik_g||0)}g</div><div class="stat-lbl">Błonnik</div></div>
-    <div class="stat"><div class="stat-val">${params.days}</div><div class="stat-lbl">Dni planu</div></div>
   </div>
-
-  <!-- MIKROSKŁADNIKI -->
   ${m.wapn_mg !== undefined ? `
   <div class="mikro-section">
-    <div class="section-title">🔬 Analiza mikroskładników — średnia dzienna (orientacyjne normy IŻŻ/WHO)</div>
+    <h3>🔬 Analiza mikroskładników (średnia dzienna · normy IŻŻ)</h3>
     <table class="mikro-table">${mikroHtml}</table>
   </div>` : ''}
-
-  <!-- OCENA AI -->
   ${aiOcenaHtml}
-
-  <!-- JADŁOSPIS -->
-  <div class="section-title" style="margin-bottom:14px;">📅 Jadłospis</div>
   ${dniHtml}
-
-  <!-- WSKAZÓWKI -->
-  ${wskazowkiHtml ? `<div class="tips"><div class="section-title" style="margin-bottom:10px;">💡 Wskazówki żywieniowe</div>${wskazowkiHtml}</div>` : ''}
-
-  <!-- STOPKA -->
-  <div class="footer">
-    <div>
-      <div class="footer-brand">NutriAI</div>
-      <div>nutriai.app &nbsp;·&nbsp; Dane: IŻŻ 2017 / USDA FoodData Central &nbsp;·&nbsp; Algorytm: Mifflin-St Jeor</div>
-    </div>
-    <div class="disclaimer">Plan żywieniowy jest inspiracją dietetyczną i nie stanowi zalecenia medycznego. Przy schorzeniach skonsultuj z dyplomowanym dietetykiem.</div>
-  </div>
-
+  ${wskazowkiHtml ? `<div class="tips"><h3>Wskazówki żywieniowe</h3>${wskazowkiHtml}</div>` : ''}
+  <div class="footer">Wygenerowano przez NutriAI &nbsp;·&nbsp; Źródło danych: IŻŻ / USDA FoodData Central &nbsp;·&nbsp; ko-fi.com/b4stek</div>
 </body>
 </html>`;
 
@@ -2919,61 +2784,8 @@ function exportToFile() {
 }
 
 // ============================================================
-// MIKROPANEL PER POSIŁEK — używany przy renderze i po wymianie
+// LISTA ZAKUPÓW
 // ============================================================
-function dodajMikroPanelDoPosilku(meal, m) {
-  const mikroPolaPosilku = ['wapn_mg','fosfor_mg','magnez_mg','potas_mg','sod_mg','zelazo_mg','cynk_mg','omega3_g','vit_c_mg','vit_d_ug','vit_b12_ug','folany_ug','selen_ug','jod_ug','nas_g'];
-  const maMikro = mikroPolaPosilku.some(f => (m[f] || 0) > 0);
-  if (!maMikro) return;
-
-  const r1m = v => Math.round(v * 10) / 10;
-  const caP = m.fosfor_mg > 1 ? (m.wapn_mg / m.fosfor_mg).toFixed(2) : null;
-  const caPColor = caP && Math.abs(parseFloat(caP) - 1) < 0.3 ? '#34d399' : '#fb923c';
-  const badge = (label, val, unit, bg, color) =>
-    val > 0 ? `<span style="padding:2px 7px;border-radius:12px;background:${bg};color:${color}">${label}: ${r1m(val)}${unit}</span>` : '';
-
-  const mikroBtnP = document.createElement('button');
-  mikroBtnP.style.cssText = 'width:100%;margin-top:5px;padding:4px;background:rgba(96,165,250,0.06);border:1px solid rgba(96,165,250,0.15);border-radius:8px;color:var(--accent2);font-size:10px;cursor:pointer;text-align:left;';
-  mikroBtnP.innerHTML = '🔬 Składniki mineralne i witaminy ▾';
-
-  const mikroPanelP = document.createElement('div');
-  mikroPanelP.style.cssText = 'display:none;margin-top:4px;padding:10px;background:var(--bg3);border-radius:8px;font-size:10px;';
-  mikroPanelP.innerHTML = `
-    <div style="font-size:9px;color:var(--text2);font-weight:600;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.05em;">🧱 Minerały</div>
-    <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;">
-      ${badge('Ca',  m.wapn_mg,   'mg', 'rgba(52,211,153,0.1)',  '#6ee7b7')}
-      ${badge('P',   m.fosfor_mg, 'mg', 'rgba(52,211,153,0.1)',  '#6ee7b7')}
-      ${caP ? `<span style="padding:2px 7px;border-radius:12px;background:rgba(52,211,153,0.08);color:${caPColor};font-weight:600">Ca:P = ${caP}</span>` : ''}
-      ${badge('Mg',  m.magnez_mg, 'mg', 'rgba(124,106,247,0.1)', '#a78bfa')}
-      ${badge('K',   m.potas_mg,  'mg', 'rgba(124,106,247,0.1)', '#a78bfa')}
-      ${badge('Na',  m.sod_mg,    'mg', 'rgba(251,146,60,0.1)',  '#fb923c')}
-      ${badge('Fe',  m.zelazo_mg, 'mg', 'rgba(251,146,60,0.1)',  '#fb923c')}
-      ${badge('Zn',  m.cynk_mg,   'mg', 'rgba(251,146,60,0.1)',  '#fb923c')}
-      ${badge('Se',  m.selen_ug,  'µg', 'rgba(251,146,60,0.1)',  '#fb923c')}
-      ${badge('I',   m.jod_ug,    'µg', 'rgba(251,146,60,0.1)',  '#fb923c')}
-    </div>
-    <div style="font-size:9px;color:var(--text2);font-weight:600;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.05em;">💊 Witaminy</div>
-    <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;">
-      ${badge('Wit.C',   m.vit_c_mg,  'mg', 'rgba(250,204,21,0.1)',  '#fbbf24')}
-      ${badge('Wit.D',   m.vit_d_ug,  'µg', 'rgba(250,204,21,0.1)',  '#fbbf24')}
-      ${badge('Wit.B12', m.vit_b12_ug,'µg', 'rgba(250,204,21,0.1)',  '#fbbf24')}
-      ${badge('Fol',     m.folany_ug, 'µg', 'rgba(250,204,21,0.1)',  '#fbbf24')}
-    </div>
-    <div style="font-size:9px;color:var(--text2);font-weight:600;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.05em;">🫀 Tłuszcze</div>
-    <div style="display:flex;flex-wrap:wrap;gap:5px;">
-      ${badge('Omega-3', m.omega3_g, 'g', 'rgba(96,165,250,0.1)', '#60a5fa')}
-      ${badge('Nas',     m.nas_g,    'g', 'rgba(251,146,60,0.1)', '#fb923c')}
-    </div>`;
-
-  mikroBtnP.onclick = () => {
-    const open = mikroPanelP.style.display !== 'none';
-    mikroPanelP.style.display = open ? 'none' : 'block';
-    mikroBtnP.innerHTML = `🔬 Składniki mineralne i witaminy ${open ? '▾' : '▴'}`;
-  };
-
-  meal.appendChild(mikroBtnP);
-  meal.appendChild(mikroPanelP);
-}
 function generateShoppingList(json) {
   const kategorie = {
     'mięso':       ['kurczak','indyk','wołowina','wieprzowina','schab','boczek','kiełbasa','szynka','polędwica'],
@@ -3298,13 +3110,7 @@ function saveDiaryEntry(date) {
 // ============================================================
 // WYMIEŃ POSIŁEK — zamień jeden posiłek zachowując makra
 // ============================================================
-async function wymienPosilek(posilek, dzien, btn, mealEl, json, params, card) {
-  const MAX_SWAP = 3;
-  const swapCount = parseInt(btn.dataset.swapCount || '0');
-  if (swapCount >= MAX_SWAP) {
-    showToast(`⚠️ Maksymalnie ${MAX_SWAP} wymiany tego posiłku`);
-    return;
-  }
+async function wymienPosilek(posilek, dzien, btn, mealEl, json, params) {
   
 
   btn.disabled = true;
@@ -3390,47 +3196,12 @@ Zwróć TYLKO JSON:
     }
     mealEl.innerHTML = html;
 
-    // Dodaj panel mikroskładników dla nowego posiłku
-    dodajMikroPanelDoPosilku(mealEl, nowyPosilek);
-
-    // Dodaj nowy przycisk wymień z aktualnym licznikiem
+    // Dodaj nowy przycisk wymień
     const newSwapBtn = document.createElement('button');
     newSwapBtn.className = 'swap-btn';
-    const nowyCount = swapCount + 1;
-    const pozostalo = MAX_SWAP - nowyCount;
-    newSwapBtn.dataset.swapCount = String(nowyCount);
-    newSwapBtn.innerHTML = pozostalo > 0
-      ? `🔄 Wymień posiłek <span style="font-size:9px;opacity:0.6">(${pozostalo} ${pozostalo===1?'zmiana':'zmiany'})</span>`
-      : `🔄 Wymień posiłek <span style="font-size:9px;opacity:0.6">(limit)</span>`;
-    if (pozostalo === 0) {
-      newSwapBtn.disabled = true;
-      newSwapBtn.style.opacity = '0.4';
-      newSwapBtn.style.cursor = 'default';
-      newSwapBtn.title = 'Osiągnięto limit wymian tego posiłku';
-    } else {
-      newSwapBtn.onclick = () => wymienPosilek(nowyPosilek, dzien, newSwapBtn, mealEl, json, params, card);
-      newSwapBtn.title = 'Wygeneruj inny posiłek o tych samych makrach';
-    }
+    newSwapBtn.innerHTML = '🔄 Wymień posiłek';
+    newSwapBtn.onclick = () => wymienPosilek(nowyPosilek, dzien, newSwapBtn, mealEl, json, params);
     mealEl.appendChild(newSwapBtn);
-
-    // Aktualizuj sumę kcal w headerze dnia
-    if (card?._aktualizujHeader) card._aktualizujHeader();
-
-    // Aktualizuj zbiorczy mikropanel dnia jeśli istnieje
-    const dayCard = mealEl.closest('.day-card');
-    if (dayCard) {
-      const mikroDniaEl = dayCard.querySelector('.mikro-dnia-panel');
-      if (mikroDniaEl) {
-        const mikroPola = ['wapn_mg','fosfor_mg','magnez_mg','potas_mg','sod_mg','zelazo_mg','cynk_mg','omega3_g','blonnik_g','vit_c_mg','vit_d_ug','vit_b12_ug','folany_ug','selen_ug','jod_ug','nas_g'];
-        const sumDnia = {};
-        dzien.posilki.forEach(p => mikroPola.forEach(f => { sumDnia[f] = (sumDnia[f]||0) + (p[f]||0); }));
-        // Odśwież etykiety w panelu dnia
-        mikroPola.forEach(f => {
-          const el = mikroDniaEl.querySelector(`[data-mikro="${f}"]`);
-          if (el) el.textContent = Math.round((sumDnia[f]||0) * 10) / 10;
-        });
-      }
-    }
 
     showToast(`✅ Zamieniono na: ${nowyPosilek.nazwa}`);
 

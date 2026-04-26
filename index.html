@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#1a1a2e">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<title>NutriAI — Generator Jadłospisów</title>
+<title>jedzAI — Generator Planów Żywieniowych</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -794,8 +794,8 @@
 
 <div class="header">
   <div>
-    <div class="header-title">NutriAI</div>
-    <div class="header-sub">Generator jadłospisów</div>
+    <div class="header-title">jedzAI</div>
+    <div class="header-sub">Generator Planów Żywieniowych</div>
   </div>
   <div id="auth-area">
     <button id="btn-login" class="auth-btn" onclick="handleLogin()">Zaloguj</button>
@@ -1100,7 +1100,7 @@
     <div class="section-label">📥 Import z pliku</div>
     <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px;">
       <p style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:12px;">
-        Możesz zaimportować produkty z pliku JSON (format NutriAI) lub CSV (format USDA). <strong style="color:var(--text)">Pełną bazę USDA</strong> można pobrać za darmo z fdc.nal.usda.gov/download-data
+        Możesz zaimportować produkty z pliku JSON (format jedzAI) lub CSV (format USDA). <strong style="color:var(--text)">Pełną bazę USDA</strong> można pobrać za darmo z fdc.nal.usda.gov/download-data
       </p>
       <div style="display:flex;gap:8px;margin-bottom:10px;">
         <label style="flex:1;padding:11px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--accent2);text-align:center;cursor:pointer;">
@@ -2374,7 +2374,7 @@ function renderResult(json) {
   printHeader.className = 'print-header';
   const p = json;
   printHeader.innerHTML = `
-    <h1>🥗 NutriAI — Plan Żywieniowy</h1>
+    <h1>🥗 jedzAI — Plan Żywieniowy</h1>
     <p>Wygenerowano: ${new Date().toLocaleDateString('pl')} &nbsp;|&nbsp; ${p.kcal_dziennie} kcal/dzień &nbsp;|&nbsp; Białko: ${r1(p.bialko_g)}g &nbsp;|&nbsp; Tłuszcze: ${r1(p.tluszcze_g)}g &nbsp;|&nbsp; Węglowodany: ${r1(p.weglowodany_g)}g</p>`;
   area.appendChild(printHeader);
 
@@ -2881,7 +2881,7 @@ function exportToFile() {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NutriAI — Plan Żywieniowy${pacjent ? ' · ' + pacjent : ''}</title>
+<title>jedzAI — Plan Żywieniowy${pacjent ? ' · ' + pacjent : ''}</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: Arial, 'Segoe UI', sans-serif; max-width: 820px; margin: 0 auto; padding: 24px; color: #222; background: #fff; font-size: 13px; }
@@ -2976,7 +2976,7 @@ function exportToFile() {
     <div class="brand">
       <div class="brand-logo">🥗</div>
       <div>
-        <div class="brand-name">NutriAI</div>
+        <div class="brand-name">jedzAI</div>
         <div class="brand-sub">Generator Planów Żywieniowych</div>
       </div>
     </div>
@@ -3057,8 +3057,8 @@ function exportToFile() {
   <!-- STOPKA -->
   <div class="footer">
     <div>
-      <div class="footer-brand">NutriAI</div>
-      <div>nutriai.app &nbsp;·&nbsp; Dane: IŻŻ 2017 / USDA FoodData Central &nbsp;·&nbsp; Algorytm: Mifflin-St Jeor</div>
+      <div class="footer-brand">jedzAI</div>
+      <div>jedzai.pl &nbsp;·&nbsp; Dane: IŻŻ 2017 / USDA FoodData Central &nbsp;·&nbsp; Algorytm: Mifflin-St Jeor</div>
     </div>
     <div class="disclaimer">Plan żywieniowy jest inspiracją dietetyczną i nie stanowi zalecenia medycznego. Przy schorzeniach skonsultuj z dyplomowanym dietetykiem.</div>
   </div>
@@ -3242,7 +3242,7 @@ function exportShoppingList() {
   });
   if (!sekcje.length) { showToast('⚠️ Brak listy zakupów'); return; }
   const date = new Date().toLocaleDateString('pl');
-  const text = `LISTA ZAKUPÓW — NutriAI\nData: ${date}\n${'='.repeat(30)}${sekcje.join('\n')}\n\n— wygenerowano przez NutriAI`;
+  const text = `LISTA ZAKUPÓW — jedzAI\nData: ${date}\n${'='.repeat(30)}${sekcje.join('\n')}\n\n— wygenerowano przez jedzAI`;
   const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
@@ -3264,7 +3264,7 @@ async function kopiujListeZakupow() {
     }
   });
   if (!linie.length) { showToast('⚠️ Brak listy zakupów'); return; }
-  const text = `🛒 Lista zakupów NutriAI\n${linie.join('\n')}`;
+  const text = `🛒 Lista zakupów jedzAI\n${linie.join('\n')}`;
   try {
     await navigator.clipboard.writeText(text);
     showToast('📋 Skopiowano do schowka!');
@@ -3795,9 +3795,9 @@ function przeliczPorcje(posilekNazwa, dzienIdx, posilekIdx, mnoznik) {
 
 function shareResult() {
   if (!currentResult) return;
-  const text = `Mój plan żywienia NutriAI:\n${currentResult.json.kcal_dziennie} kcal/dzień\nBiałko: ${currentResult.json.bialko_g}g | Tłuszcze: ${currentResult.json.tluszcze_g}g | Węglowodany: ${currentResult.json.weglowodany_g}g\n\nWygenerowano przez NutriAI 🌿`;
+  const text = `Mój plan żywienia jedzAI:\n${currentResult.json.kcal_dziennie} kcal/dzień\nBiałko: ${currentResult.json.bialko_g}g | Tłuszcze: ${currentResult.json.tluszcze_g}g | Węglowodany: ${currentResult.json.weglowodany_g}g\n\nWygenerowano przez jedzAI 🌿`;
   if (navigator.share) {
-    navigator.share({ title: 'NutriAI — Mój jadłospis', text });
+    navigator.share({ title: 'jedzAI — Mój jadłospis', text });
   } else {
     navigator.clipboard.writeText(text);
     showToast('📋 Skopiowano do schowka');
@@ -4493,7 +4493,7 @@ async function importujPlik(input) {
       const parsed = JSON.parse(text);
       produkty = Array.isArray(parsed) ? parsed : Object.entries(parsed).map(([nazwa,dane]) => ({nazwa,...dane}));
     } else if (file.name.endsWith('.csv')) {
-      // Prosty parser CSV (format USDA lub NutriAI)
+      // Prosty parser CSV (format USDA lub jedzAI)
       const lines = text.split('\n');
       const headers = lines[0].split(',').map(h => h.trim().replace(/"/g,'').toLowerCase());
       produkty = lines.slice(1).filter(l=>l.trim()).map(line => {

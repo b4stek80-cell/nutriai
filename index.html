@@ -2300,6 +2300,17 @@ function renderResult(json) {
     header.onclick = () => card.classList.toggle('open');
     card.appendChild(header);
 
+    // Funkcja aktualizacji headera dnia po wymianie posiłku
+    card._aktualizujHeader = () => {
+      const nowyTotal = day.posilki.reduce((s,m) => s+(m.kcal||0), 0);
+      const nowyOK = kcalMinP === 0 || (nowyTotal >= kcalMinP && nowyTotal <= kcalMaxP);
+      const nowyBadge = params.doceloweKcal
+        ? `<span style="font-size:10px;padding:2px 8px;border-radius:10px;margin-left:6px;font-weight:600;background:${nowyOK?'rgba(52,211,153,0.2)':'rgba(251,146,60,0.2)'};color:${nowyOK?'#34d399':'#fb923c'}">${nowyOK?'✓':'⚠'} ${nowyTotal} kcal</span>`
+        : `<span class="day-kcal">${nowyTotal} kcal</span>`;
+      header.innerHTML = `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px"><div class="day-name">${day.dzien}</div>${nowyBadge}</div><span class="day-chevron">▼</span>`;
+      header.onclick = () => card.classList.toggle('open');
+    };
+
     const body = document.createElement('div');
     body.className = 'day-body';
 
@@ -2351,7 +2362,7 @@ function renderResult(json) {
       swapBtn.className = 'swap-btn';
       swapBtn.innerHTML = '🔄 Wymień posiłek';
       swapBtn.title = 'Wygeneruj inny posiłek o tych samych makrach';
-      swapBtn.onclick = () => wymienPosilek(m, day, swapBtn, meal, json, params);
+      swapBtn.onclick = () => wymienPosilek(m, day, swapBtn, meal, json, params, card);
       meal.appendChild(swapBtn);
 
       // Przyciski przelicznika porcji
@@ -3030,7 +3041,7 @@ function saveDiaryEntry(date) {
 // ============================================================
 // WYMIEŃ POSIŁEK — zamień jeden posiłek zachowując makra
 // ============================================================
-async function wymienPosilek(posilek, dzien, btn, mealEl, json, params) {
+async function wymienPosilek(posilek, dzien, btn, mealEl, json, params, card) {
   
 
   btn.disabled = true;
@@ -3120,8 +3131,11 @@ Zwróć TYLKO JSON:
     const newSwapBtn = document.createElement('button');
     newSwapBtn.className = 'swap-btn';
     newSwapBtn.innerHTML = '🔄 Wymień posiłek';
-    newSwapBtn.onclick = () => wymienPosilek(nowyPosilek, dzien, newSwapBtn, mealEl, json, params);
+    newSwapBtn.onclick = () => wymienPosilek(nowyPosilek, dzien, newSwapBtn, mealEl, json, params, card);
     mealEl.appendChild(newSwapBtn);
+
+    // Aktualizuj sumę kcal w headerze dnia
+    if (card?._aktualizujHeader) card._aktualizujHeader();
 
     showToast(`✅ Zamieniono na: ${nowyPosilek.nazwa}`);
 

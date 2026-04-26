@@ -1177,9 +1177,38 @@ async function handleLogout() {
 }
 
 function getAuthHeaders() {
-  return currentSession?.access_token
-    ? { 'Authorization': `Bearer ${currentSession.access_token}` }
-    : {};
+  const headers = {};
+  if (currentSession?.access_token)
+    headers['Authorization'] = `Bearer ${currentSession.access_token}`;
+  const adminKey = localStorage.getItem('nutriai_admin_key');
+  if (adminKey)
+    headers['X-Admin-Key'] = adminKey;
+  headers['X-User-Email'] = currentUser?.email || '';
+  return headers;
+}
+
+// Lekkie wywołanie Gemini przez /query (bez dziennego rate-limitu) — do korekt i szybkich operacji
+async function callGeminiQuery(prompt, temperatura = 0.3) {
+  const endpoint = BACKEND_URL
+    ? `${BACKEND_URL}/query`
+    : `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: temperatura, maxOutputTokens: 4096, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } }
+      })
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const text = (data.candidates?.[0]?.content?.parts?.[0]?.text || '')
+      .replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    return text ? JSON.parse(text) : null;
+  } catch (_) {
+    return null;
+  }
 }
 // ───────────────────────────────────────────────────────────────────────────
 
@@ -1408,6 +1437,88 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove('show'), 2500);
 }
 
+// Wykrywa frazy "stosunek X do Y N:N" i zamienia je na konkretne instrukcje dla AI
+function parseWytyczneKliniczne(text) {
+  if (!text) return text;
+
+  const RATIO_DB = [
+    {
+      testA: w => /^(wapn|wapni|calcium)/i.test(w),
+      testB: w => /^(fosfor|phosph)/i.test(w),
+      get: (a, b) => ({
+        '1:1': 'WYMAGANE: stosunek Ca:P = 1:1. KAŻDY DZIEŃ MUSI zawierać minimum 3 porcje nabiału o dobrym Ca:P: mleko 2% 250ml (Ca:P=1.18), jogurt naturalny 200g (Ca:P=1.06), maślanka 200ml (Ca:P=1.25), tofu 150g (Ca:P=3.61), feta 50g (Ca:P=1.46). Śniadanie: jogurt lub mleko; obiad: tofu lub feta; kolacja: maślanka lub mleko. Większość mięs i zbóż ma Ca:P=0.04–0.13 — użyj ich tylko jako DODATEK do nabiału, nie jako główny składnik. Unikaj: parówki, kiełbasy, wędliny, cola, napoje energetyczne.',
+        '2:1': 'WYMAGANE: stosunek Ca:P = 2:1. KAŻDY DZIEŃ MUSI być zdominowany przez nabiał: mleko 2% 500ml (Ca:P=1.18), tofu 200g (Ca:P=3.61), feta 80g (Ca:P=1.46), sezam 30g (Ca:P=1.55). Mięso i zboża tylko w małych ilościach. Unikaj: przetworzone mięso, cola, napoje gazowane.',
+      }[`${a}:${b}`] || `WYMAGANE: stosunek Ca:P = ${a}:${b}. Preferuj nabiał, sardynki z ośćmi, warzywa liściaste (jarmuż, brokuł). Ogranicz przetworzone mięso i napoje gazowane.`),
+    },
+    {
+      testA: w => /omega.?3/i.test(w),
+      testB: w => /omega.?6/i.test(w),
+      get: (a, b) => `WYMAGANE: stosunek omega-3 do omega-6 = ${a}:${b}. Wybieraj: łosoś, makrela, sardynki, siemię lniane, nasiona chia, orzechy włoskie. Ogranicz: oleje słonecznikowe i kukurydziane.`,
+    },
+    {
+      testA: w => /^(s[oó]d)/.test(w),
+      testB: w => /^(potas)/.test(w),
+      get: (a, b) => `WYMAGANE: stosunek Na:K = ${a}:${b}. Preferuj produkty bogate w potas: banany, bataty, pomidory, szpinak, awokado, fasola. Ogranicz sód: wędliny, sery żółte, chipsy, konserwy.`,
+    },
+  ];
+
+  const pattern = /stosunek\s+([\p{L}0-9\-]+)\s+do\s+([\p{L}0-9\-]+)\s+(\d+(?:[.,]\d+)?)\s*:\s*(\d+(?:[.,]\d+)?)/giu;
+
+  const additions = [];
+  let match;
+  while ((match = pattern.exec(text)) !== null) {
+    const wA = match[1].toLowerCase().trim();
+    const wB = match[2].toLowerCase().trim();
+    const nA = parseFloat(match[3].replace(',', '.'));
+    const nB = parseFloat(match[4].replace(',', '.'));
+    for (const entry of RATIO_DB) {
+      if (entry.testA(wA) && entry.testB(wB)) {
+        additions.push(entry.get(nA, nB));
+        break;
+      }
+    }
+  }
+
+  return additions.length ? text + '\n' + additions.join('\n') : text;
+}
+
+// Ekstrakt wymogów stosunków z tekstu wytycznych do struktury danych (dla post-processingu)
+function extractRatioConstraints(text) {
+  if (!text) return [];
+
+  const FIELD_MAP = [
+    {
+      testA: w => /^(wapn|wapni|calcium)/i.test(w),
+      testB: w => /^(fosfor|phosph)/i.test(w),
+      fieldA: 'wapn_mg', fieldB: 'fosfor_mg',
+      labelA: 'Ca', labelB: 'P',
+    },
+    {
+      testA: w => /^(s[oó]d)/i.test(w),
+      testB: w => /^(potas)/i.test(w),
+      fieldA: 'sod_mg', fieldB: 'potas_mg',
+      labelA: 'Na', labelB: 'K',
+    },
+  ];
+
+  const pattern = /stosunek\s+([\p{L}0-9\-]+)\s+do\s+([\p{L}0-9\-]+)\s+(\d+(?:[.,]\d+)?)\s*:\s*(\d+(?:[.,]\d+)?)/giu;
+  const constraints = [];
+  let match;
+  while ((match = pattern.exec(text)) !== null) {
+    const wA = match[1].toLowerCase();
+    const wB = match[2].toLowerCase();
+    const nA = parseFloat(match[3].replace(',', '.'));
+    const nB = parseFloat(match[4].replace(',', '.'));
+    for (const entry of FIELD_MAP) {
+      if (entry.testA(wA) && entry.testB(wB)) {
+        constraints.push({ ...entry, ratioA: nA, ratioB: nB, targetRatio: nA / nB });
+        break;
+      }
+    }
+  }
+  return constraints;
+}
+
 const loaderMessages = [
   'Obliczam zapotrzebowanie kaloryczne...',
   'Dobieram składniki z bazy IŻŻ...',
@@ -1434,6 +1545,7 @@ async function generate() {
   const days = getChipVal('daysChips');
   const allergies = document.getElementById('allergies').value;
   const wytyczneKliniczne = document.getElementById('wytyczneKliniczne').value.trim();
+  const wytyczneExpanded = parseWytyczneKliniczne(wytyczneKliniczne);
   const mode = getChipVal('modeChips') || 'standard';
   const disease = getChipVal('diseaseChips') || '';
 
@@ -1473,9 +1585,10 @@ async function generate() {
 
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
-          const msg = err.error?.message || `HTTP ${res.status}`;
-          // Przy błędzie 503 (high demand) lub 429 (rate limit) — ponów próbę
-          if ((res.status === 503 || res.status === 429 || res.status === 500) && attempt < MAX_RETRIES) {
+          const msg = err.error || err.error?.message || `HTTP ${res.status}`;
+          // 429 od własnego backendu = dzienny limit — nie ponawiaj
+          const isDailyLimit = res.status === 429 && msg.toString().includes('limit');
+          if (!isDailyLimit && (res.status === 503 || res.status === 429 || res.status === 500) && attempt < MAX_RETRIES) {
             document.getElementById('loaderText').textContent =
               `Serwer zajęty — próba ${attempt+1}/${MAX_RETRIES}...`;
             await new Promise(r => setTimeout(r, RETRY_DELAY * attempt));
@@ -1652,8 +1765,8 @@ Nie wolno przekroczyć ${kcalMax} kcal ani zejść poniżej ${kcalMin} kcal w ż
       'Kolacja':          0.20, 'kolacja':          0.20,
     };
 
-    const promptRAG = `Zaplanuj jadłospis na ${days} dni dla osoby: ${gender}, ${age} lat, dieta: ${diet}, ${meals} posiłków/dzień${allergies ? ', wykluczone: '+allergies : ''}.
-${trybOpis ? `\nWYTYCZNE KLINICZNE: ${trybOpis}` : ''}${dabrowskaOpis ? `\n${dabrowskaOpis}` : ''}${wytyczneKliniczne ? `\nDODATKOWE WYTYCZNE: ${wytyczneKliniczne}` : ''}
+    const promptRAG = `${wytyczneExpanded ? `WYMAGANIA KRYTYCZNE — PRZESTRZEGAJ BEZWZGLĘDNIE WE WSZYSTKICH DNIACH:\n${wytyczneExpanded}\n\n` : ''}Zaplanuj jadłospis na ${days} dni dla osoby: ${gender}, ${age} lat, dieta: ${diet}, ${meals} posiłków/dzień${allergies ? ', wykluczone: '+allergies : ''}.
+${trybOpis ? `\nWYTYCZNE KLINICZNE: ${trybOpis}` : ''}${dabrowskaOpis ? `\n${dabrowskaOpis}` : ''}
 
 ZASADY:
 1. Każdy dzień INNY — nie powtarzaj posiłków
@@ -1685,12 +1798,16 @@ Nazwy posiłków max 5 słów. 5 wskazówek żywieniowych.`;
       'masło orzechowe': [10,40],
       // Przyprawy/dodatki
       'miód': [5,30], 'dżem': [15,40],
-      // Orzechy/nasiona
+      // Orzechy/nasiona — małe porcje
       'migdały': [10,50], 'orzechy włoskie': [10,50], 'nasiona chia': [10,30],
       'siemię lniane': [10,30], 'nasiona słonecznika': [10,40],
+      'nasiona dyni': [10,40], 'sezam': [5,30], 'mak': [5,20],
+      'orzechy nerkowca': [10,50], 'orzechy laskowe': [10,50],
       // Mięso/ryby
       'pierś z kurczaka': [80,250], 'udo z kurczaka': [100,250],
-      'łosoś': [80,200], 'tuńczyk w wodzie': [80,200], 'dorsz': [100,250],
+      'indyk pierś': [80,250], 'wołowina chuda': [80,200],
+      'łosoś': [80,200], 'tuńczyk w wodzie': [80,180], 'dorsz': [80,220],
+      'makrela': [80,180], 'łosoś wędzony': [40,120],
       'jajko': [55,220], // 1-4 jajka
       // Nabiał
       'jogurt naturalny': [100,300], 'jogurt grecki': [100,250],
@@ -1704,13 +1821,22 @@ Nazwy posiłków max 5 słów. 5 wskazówek żywieniowych.`;
       'quinoa': [40,150], 'makaron pszenny': [50,220], 'makaron pełnoziarnisty': [50,220],
       // Pieczywo
       'chleb graham': [30,150], 'chleb żytni': [30,150], 'tortilla pszenna': [30,80],
-      // Warzywa — duże porcje OK
-      'brokuł': [50,400], 'szpinak': [30,200], 'marchew': [50,300],
-      'pomidor': [50,300], 'ogórek': [50,300], 'papryka czerwona': [50,250],
-      'kapusta biała': [50,300], 'sałata': [20,150],
+      // Warzywa — limity fizjologiczne
+      'brokuł': [50,300], 'szpinak': [30,200], 'marchew': [50,250],
+      'pomidor': [50,250], 'ogórek': [50,250], 'papryka czerwona': [50,200],
+      'papryka żółta': [50,200], 'kapusta biała': [50,250], 'kapusta czerwona': [50,250],
+      'sałata': [20,120], 'sałata lodowa': [20,120], 'rukola': [20,80],
+      'jarmuż': [20,100], 'szparagi': [50,200], 'cukinia': [80,250],
+      'bakłażan': [80,250], 'grzyby pieczarki': [50,200], 'buraki': [50,180],
+      'seler naciowy': [30,150], 'seler korzeniowy': [30,150],
+      'por': [30,120], 'cebula': [20,100], 'czosnek': [2,15],
+      'natka pietruszki': [5,20], 'rzodkiewka': [20,80],
+      'kukurydza': [50,150], 'groszek zielony': [50,150],
+      'fasola szparagowa': [50,200], 'brukselka': [50,200],
       // Owoce
-      'jabłko': [80,250], 'banan': [60,200], 'truskawki': [50,250],
-      'borówki': [50,200], 'pomarańcza': [100,250],
+      'jabłko': [80,250], 'banan': [80,200], 'truskawki': [50,200],
+      'borówki': [50,150], 'pomarańcza': [100,220], 'maliny': [50,150],
+      'kiwi': [60,150], 'grejpfrut': [100,220], 'cytryna': [10,50],
       // Strączkowe
       'soczewica czerwona': [40,200], 'ciecierzyca': [50,250],
       'fasola czerwona': [50,200], 'tofu': [80,250],
@@ -1737,7 +1863,9 @@ Nazwy posiłków max 5 słów. 5 wskazówek żywieniowych.`;
         const totalPct = wolne.reduce((s, x) => s + (x.procent_kcal || 100/znane.length), 0);
 
         wolne.forEach(s => {
-          const [minG, maxG] = LIMITY_GRAMATUR[s.nazwa] || [5, 500];
+          const _kcal100 = s.dane?.kcal || 100;
+          const _defaultMax = _kcal100 < 50 ? 150 : _kcal100 < 100 ? 250 : 400;
+          const [minG, maxG] = LIMITY_GRAMATUR[s.nazwa] || [10, _defaultMax];
           const kcalTarget = pozostaleKcal * ((s.procent_kcal || 100/znane.length) / totalPct);
           let gramy = Math.round(kcalTarget * 100 / s.dane.kcal / 5) * 5;
           gramy = Math.max(minG, Math.min(maxG, gramy));
@@ -1853,15 +1981,18 @@ Nazwy posiłków max 5 słów. 5 wskazówek żywieniowych.`;
     document.getElementById('loaderText').textContent = 'Finalna weryfikacja kaloryczna...';
     const promptParams = {
       gender, age, height, weight, activity, goal, diet, meals,
-      allergies, wytyczneKliniczne, mode, disease, bazaHint,
+      allergies, wytyczneKliniczne: wytyczneExpanded, mode, disease, bazaHint,
       doceloweBialko, doceloweTluszcze, doceloweWegl,
       kcalMin, kcalMax, trybOpis, dabrowskaOpis,
       tolerancjaPct
     };
     const jsonSkalowany = await skalujPosilkiDoCelu(jsonWzbogacony, doceloweKcal, callGemini, promptParams);
 
+    document.getElementById('loaderText').textContent = 'Weryfikuję stosunki składników...';
+    const jsonWeryfikowany = await weryfikujIKorygujStosunki(jsonSkalowany, wytyczneKliniczne);
+
     currentResult = {
-      json: jsonSkalowany,
+      json: jsonWeryfikowany,
       params: { age, gender, height, weight, goal, diet, days, mode, disease,
                 bmr: Math.round(bmr), tdee, doceloweKcal, kcalMin, kcalMax,
                 uzytkoReczne: uzytkoReczne || false,
@@ -1870,14 +2001,15 @@ Nazwy posiłków max 5 słów. 5 wskazówek żywieniowych.`;
                 doceloweBialko, doceloweTluszcze, doceloweWegl },
       date: new Date().toLocaleDateString('pl')
     };
-    renderResult(jsonSkalowany);
+    renderResult(jsonWeryfikowany);
 
   } catch(e) {
     clearInterval(msgInterval);
     document.getElementById('loader').classList.remove('visible');
     document.getElementById('emptyResult').style.display = 'flex';
-    document.getElementById('emptyResult').querySelector('.empty-sub').textContent = 'Błąd: ' + e.message;
-    showToast('❌ ' + e.message.substring(0, 40));
+    const errMsg = e.message || 'Nieznany błąd';
+    document.getElementById('emptyResult').querySelector('.empty-sub').textContent = errMsg;
+    showToast('❌ ' + errMsg.substring(0, 60));
   }
 }
 
@@ -2235,8 +2367,107 @@ function renderResult(json) {
           style="font-size:10px;padding:3px 8px;background:rgba(124,106,247,0.1);border:1px solid rgba(124,106,247,0.2);border-radius:12px;color:var(--accent2);cursor:pointer;">×1.5</button>`;
       meal.appendChild(porcjeRow);
 
+      // Przycisk "Więcej minerałów" per posiłek
+      const mikroPolaPosilku = ['wapn_mg','fosfor_mg','magnez_mg','potas_mg','sod_mg','zelazo_mg','cynk_mg','omega3_g','vit_c_mg','vit_d_ug','vit_b12_ug','folany_ug','selen_ug','jod_ug','nas_g'];
+      const maMikro = mikroPolaPosilku.some(f => (m[f] || 0) > 0);
+      if (maMikro) {
+        const r1m = v => Math.round(v * 10) / 10;
+        const caP = m.fosfor_mg > 1 ? (m.wapn_mg / m.fosfor_mg).toFixed(2) : null;
+        const caPColor = caP && Math.abs(parseFloat(caP) - 1) < 0.3 ? '#34d399' : '#fb923c';
+
+        const mikroBtnP = document.createElement('button');
+        mikroBtnP.style.cssText = 'width:100%;margin-top:5px;padding:4px;background:rgba(96,165,250,0.06);border:1px solid rgba(96,165,250,0.15);border-radius:8px;color:var(--accent2);font-size:10px;cursor:pointer;text-align:left;';
+        mikroBtnP.innerHTML = '🔬 Składniki mineralne i witaminy ▾';
+
+        const mikroPanelP = document.createElement('div');
+        mikroPanelP.style.cssText = 'display:none;margin-top:4px;padding:10px;background:var(--bg3);border-radius:8px;font-size:10px;';
+
+        // Pomocnik do tworzenia badge
+        const badge = (label, val, unit, bg, color) =>
+          val > 0 ? `<span style="padding:2px 7px;border-radius:12px;background:${bg};color:${color}">${label}: ${r1m(val)}${unit}</span>` : '';
+
+        mikroPanelP.innerHTML = `
+          <div style="font-size:9px;color:var(--text2);font-weight:600;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.05em;">🧱 Minerały</div>
+          <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;">
+            ${badge('Ca',  m.wapn_mg,   'mg', 'rgba(52,211,153,0.1)',  '#6ee7b7')}
+            ${badge('P',   m.fosfor_mg, 'mg', 'rgba(52,211,153,0.1)',  '#6ee7b7')}
+            ${caP ? `<span style="padding:2px 7px;border-radius:12px;background:rgba(52,211,153,0.08);color:${caPColor};font-weight:600">Ca:P = ${caP}</span>` : ''}
+            ${badge('Mg',  m.magnez_mg, 'mg', 'rgba(124,106,247,0.1)', '#a78bfa')}
+            ${badge('K',   m.potas_mg,  'mg', 'rgba(124,106,247,0.1)', '#a78bfa')}
+            ${badge('Na',  m.sod_mg,    'mg', 'rgba(251,146,60,0.1)',  '#fb923c')}
+            ${badge('Fe',  m.zelazo_mg, 'mg', 'rgba(251,146,60,0.1)',  '#fb923c')}
+            ${badge('Zn',  m.cynk_mg,   'mg', 'rgba(251,146,60,0.1)',  '#fb923c')}
+            ${badge('Se',  m.selen_ug,  'µg', 'rgba(251,146,60,0.1)',  '#fb923c')}
+            ${badge('I',   m.jod_ug,    'µg', 'rgba(251,146,60,0.1)',  '#fb923c')}
+          </div>
+          <div style="font-size:9px;color:var(--text2);font-weight:600;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.05em;">💊 Witaminy</div>
+          <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;">
+            ${badge('Wit.C',   m.vit_c_mg,  'mg', 'rgba(250,204,21,0.1)',  '#fbbf24')}
+            ${badge('Wit.D',   m.vit_d_ug,  'µg', 'rgba(250,204,21,0.1)',  '#fbbf24')}
+            ${badge('Wit.B12', m.vit_b12_ug,'µg', 'rgba(250,204,21,0.1)',  '#fbbf24')}
+            ${badge('Fol',     m.folany_ug, 'µg', 'rgba(250,204,21,0.1)',  '#fbbf24')}
+          </div>
+          <div style="font-size:9px;color:var(--text2);font-weight:600;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.05em;">🫀 Tłuszcze</div>
+          <div style="display:flex;flex-wrap:wrap;gap:5px;">
+            ${badge('Omega-3', m.omega3_g, 'g', 'rgba(96,165,250,0.1)', '#60a5fa')}
+            ${badge('Nas',     m.nas_g,    'g', 'rgba(251,146,60,0.1)', '#fb923c')}
+          </div>`;
+
+        mikroBtnP.onclick = () => {
+          const open = mikroPanelP.style.display !== 'none';
+          mikroPanelP.style.display = open ? 'none' : 'block';
+          mikroBtnP.innerHTML = `🔬 Składniki mineralne i witaminy ${open ? '▾' : '▴'}`;
+        };
+
+        meal.appendChild(mikroBtnP);
+        meal.appendChild(mikroPanelP);
+      }
+
       body.appendChild(meal);
     });
+
+    // Mikroskładniki dnia — zwijana sekcja
+    const sumDnia = {};
+    const mikroPola = ['wapn_mg','fosfor_mg','magnez_mg','potas_mg','sod_mg','zelazo_mg','cynk_mg','omega3_g','blonnik_g'];
+    day.posilki.forEach(p => mikroPola.forEach(f => { sumDnia[f] = (sumDnia[f]||0) + (p[f]||0); }));
+    const majakieDane = mikroPola.some(f => (sumDnia[f]||0) > 0);
+
+    if (majakieDane) {
+      const r1m = v => Math.round(v * 10) / 10;
+      const caP = sumDnia.fosfor_mg > 1 ? (sumDnia.wapn_mg / sumDnia.fosfor_mg).toFixed(2) : '—';
+      const caPColor = sumDnia.fosfor_mg > 1
+        ? (Math.abs(sumDnia.wapn_mg/sumDnia.fosfor_mg - 1) < 0.3 ? '#34d399' : '#fb923c')
+        : 'var(--text2)';
+
+      const mikroBtn = document.createElement('button');
+      mikroBtn.style.cssText = 'width:100%;margin-top:10px;padding:6px;background:rgba(124,106,247,0.07);border:1px solid rgba(124,106,247,0.15);border-radius:8px;color:var(--accent2);font-size:11px;cursor:pointer;text-align:left;';
+      mikroBtn.innerHTML = '🔬 Minerały i witaminy dnia ▾';
+
+      const mikroPanel = document.createElement('div');
+      mikroPanel.style.cssText = 'display:none;margin-top:6px;padding:10px;background:var(--bg3);border-radius:8px;font-size:11px;';
+      mikroPanel.innerHTML = `
+        <div style="display:flex;flex-wrap:wrap;gap:6px;">
+          ${sumDnia.wapn_mg   > 0 ? `<span style="padding:3px 8px;border-radius:12px;background:rgba(52,211,153,0.1);color:#6ee7b7">Ca: ${Math.round(sumDnia.wapn_mg)}mg</span>` : ''}
+          ${sumDnia.fosfor_mg > 0 ? `<span style="padding:3px 8px;border-radius:12px;background:rgba(52,211,153,0.1);color:#6ee7b7">P: ${Math.round(sumDnia.fosfor_mg)}mg</span>` : ''}
+          ${sumDnia.wapn_mg > 0 && sumDnia.fosfor_mg > 1 ? `<span style="padding:3px 8px;border-radius:12px;background:rgba(52,211,153,0.08);color:${caPColor};font-weight:600">Ca:P = ${caP}</span>` : ''}
+          ${sumDnia.magnez_mg > 0 ? `<span style="padding:3px 8px;border-radius:12px;background:rgba(124,106,247,0.1);color:#a78bfa">Mg: ${Math.round(sumDnia.magnez_mg)}mg</span>` : ''}
+          ${sumDnia.potas_mg  > 0 ? `<span style="padding:3px 8px;border-radius:12px;background:rgba(124,106,247,0.1);color:#a78bfa">K: ${Math.round(sumDnia.potas_mg)}mg</span>` : ''}
+          ${sumDnia.sod_mg    > 0 ? `<span style="padding:3px 8px;border-radius:12px;background:rgba(251,146,60,0.1);color:#fb923c">Na: ${Math.round(sumDnia.sod_mg)}mg</span>` : ''}
+          ${sumDnia.zelazo_mg > 0 ? `<span style="padding:3px 8px;border-radius:12px;background:rgba(251,146,60,0.1);color:#fb923c">Fe: ${r1m(sumDnia.zelazo_mg)}mg</span>` : ''}
+          ${sumDnia.cynk_mg   > 0 ? `<span style="padding:3px 8px;border-radius:12px;background:rgba(251,146,60,0.1);color:#fb923c">Zn: ${r1m(sumDnia.cynk_mg)}mg</span>` : ''}
+          ${sumDnia.omega3_g  > 0 ? `<span style="padding:3px 8px;border-radius:12px;background:rgba(96,165,250,0.1);color:#60a5fa">ω-3: ${r1m(sumDnia.omega3_g)}g</span>` : ''}
+          ${sumDnia.blonnik_g > 0 ? `<span style="padding:3px 8px;border-radius:12px;background:rgba(96,165,250,0.1);color:#60a5fa">Błon: ${r1m(sumDnia.blonnik_g)}g</span>` : ''}
+        </div>`;
+
+      mikroBtn.onclick = () => {
+        const open = mikroPanel.style.display !== 'none';
+        mikroPanel.style.display = open ? 'none' : 'block';
+        mikroBtn.innerHTML = `🔬 Minerały i witaminy dnia ${open ? '▾' : '▴'}`;
+      };
+
+      body.appendChild(mikroBtn);
+      body.appendChild(mikroPanel);
+    }
 
     card.appendChild(body);
     area.appendChild(card);
@@ -2809,11 +3040,12 @@ async function wymienPosilek(posilek, dzien, btn, mealEl, json, params) {
   const diet = params?.diet || getChipVal('dietChips') || 'tradycyjna';
   const allergies = document.getElementById('allergies')?.value || '';
   const wytyczneKliniczne = document.getElementById('wytyczneKliniczne')?.value?.trim() || '';
+  const wytyczneExpanded = parseWytyczneKliniczne(wytyczneKliniczne);
   const mode = getChipVal('modeChips') || 'standard';
   const disease = mode === 'kliniczny' ? (getChipVal('diseaseChips') || '') : '';
 
-  const prompt = `Zaproponuj INNY posiłek zamiast "${posilek.nazwa}" na porę: ${posilek.pora}.
-Dieta: ${diet}${allergies ? ', wykluczone produkty: '+allergies : ''}.${disease ? ' Jednostka: '+disease+'.' : ''}${wytyczneKliniczne ? '\nDodatkowe wytyczne: '+wytyczneKliniczne : ''}
+  const prompt = `${wytyczneExpanded ? `WYMAGANIA KRYTYCZNE — BEZWZGLĘDNIE OBOWIĄZUJĄCE:\n${wytyczneExpanded}\n\n` : ''}Zaproponuj INNY posiłek zamiast "${posilek.nazwa}" na porę: ${posilek.pora}.
+Dieta: ${diet}${allergies ? ', wykluczone produkty: '+allergies : ''}.${disease ? ' Jednostka: '+disease+'.' : ''}
 Zachowaj zbliżone makroskładniki: ~${posilek.kcal} kcal, białko ~${posilek.bialko_g}g, tłuszcze ~${posilek.tluszcze_g}g, węglowodany ~${posilek.weglowodany_g}g.
 Podaj inny posiłek niż: ${(dzien.posilki||[]).map(p=>p.nazwa).join(', ')}.
 
@@ -4079,14 +4311,14 @@ async function skalujPosilkiDoCelu(json, doceloweKcal, callGeminiFn, promptParam
             .filter((_, i) => i !== di)
             .flatMap(dn => dn.posilki.map(p => p.nazwa)).join(', ');
 
-          const promptDnia = `Ułóż jadłospis na 1 dzień (Dzień ${numerDnia}) dla osoby: ${gender}, ${age} lat, ${height}cm, ${weight}kg, aktywność: ${activity}, cel: ${goal}, dieta: ${d}, ${meals} posiłków/dzień${allergies ? ', wykluczone produkty: '+allergies : ''}.
+          const promptDnia = `${wytyczneKliniczne ? `WYMAGANIA KRYTYCZNE — PRZESTRZEGAJ BEZWZGLĘDNIE:\n${wytyczneKliniczne}\n\n` : ''}Ułóż jadłospis na 1 dzień (Dzień ${numerDnia}) dla osoby: ${gender}, ${age} lat, ${height}cm, ${weight}kg, aktywność: ${activity}, cel: ${goal}, dieta: ${d}, ${meals} posiłków/dzień${allergies ? ', wykluczone produkty: '+allergies : ''}.
 
 KLUCZOWE WYMOGI:
 - Kaloryczność dnia: ${kcalMin}–${kcalMax} kcal (cel: ${doceloweKcal})
 - Białko: ~${doceloweBialko}g (±20%), Tłuszcze: ~${doceloweTluszcze}g (±20%), Węglowodany: ~${doceloweWegl}g (±20%)
 Używaj składników z bazy IŻŻ: ${bazaHint}
 Podaj gramaturę każdego składnika. ZAKAZ dań złożonych — tylko podstawowe składniki (zamiast "bigos" → kapusta kiszona + wieprzowina + kiełbasa).
-${trybOpis ? 'WYTYCZNE KLINICZNE: '+trybOpis : ''}${dabrowskaOpis||''}${wytyczneKliniczne ? '\nDODATKOWE WYTYCZNE:\n'+wytyczneKliniczne : ''}
+${trybOpis ? 'WYTYCZNE KLINICZNE: '+trybOpis : ''}${dabrowskaOpis||''}
 Nie powtarzaj: ${istniejacePosilki || 'brak'}.
 Zwróć TYLKO JSON:
 {"dzien":"Dzień ${numerDnia}","posilki":[{"pora":"string","nazwa":"string","skladniki":["składnik gramatura"],"kcal":number,"bialko_g":number,"tluszcze_g":number,"weglowodany_g":number}]}`;
@@ -4254,6 +4486,80 @@ Zwróć TYLKO JSON:
     json.mikro[pole] = Math.round((suma[pole]||0) / liczbaDni * 10) / 10;
   }
   json._kalibracja = { skalowano: skalowanoDni, regenerowano: regenerowanoDni, korekcjaMakro: korektaMakroDni, kalibrowano: kalibrowanoDni };
+
+  return json;
+}
+
+// Post-processing: weryfikuje stosunki mineralów i koryguje je przez Gemini jeśli odbiega >25%
+async function weryfikujIKorygujStosunki(json, wytyczneRaw) {
+  const constraints = extractRatioConstraints(wytyczneRaw);
+  if (!constraints.length) return json;
+
+  const TOL = 0.25;
+  const mikro_pola = ['wapn_mg','zelazo_mg','magnez_mg','potas_mg','vit_c_mg','vit_a_ug','vit_d_ug','vit_b12_ug','folany_ug','cynk_mg','sod_mg','fosfor_mg','selen_ug','jod_ug','nas_g','omega3_g'];
+
+  // Deterministyczne zamiany: produkt wysokofosforowy → zamiennik z dobrym Ca:P
+  // Kluczowa zamiana: mięso (Ca:P=0.05) → tofu (Ca:P=3.61) — jedyna interwencja
+  // która matematycznie naprawia Ca:P w pojedynczym posiłku
+  const MEAT_RE = /kurczak|indyk|wołowin|wieprzow|schab|polędwic|udziec|pierś z kurczaka|udo z kurczaka|dorsz|makrela|tuńczyk|łosoś/i;
+
+  for (const c of constraints) {
+    if (c.labelA !== 'Ca') continue; // tylko korekta Ca:P na razie
+
+    for (let di = 0; di < (json.dni || []).length; di++) {
+      const dzien = json.dni[di];
+
+      const sumA = () => dzien.posilki.reduce((s, p) => s + (p[c.fieldA] || 0), 0);
+      const sumB = () => dzien.posilki.reduce((s, p) => s + (p[c.fieldB] || 0), 0);
+
+      let passes = () => {
+        const vB = sumB(); if (vB < 10) return true;
+        return Math.abs(sumA()/vB - c.targetRatio) / c.targetRatio <= TOL;
+      };
+
+      if (passes()) continue;
+
+      // Posortuj posiłki malejąco po fosforze — naprawiaj od najgorszego
+      const posortowane = [...dzien.posilki]
+        .map((p, i) => ({ p, i, ratio: (p[c.fieldA]||0) / Math.max(p[c.fieldB]||1, 1) }))
+        .sort((a, b) => a.ratio - b.ratio); // najgorszy Ca:P najpierw
+
+      for (const { p: posilek } of posortowane) {
+        if (passes()) break;
+
+        const hasMeat = (posilek.skladniki || []).some(s =>
+          MEAT_RE.test(typeof s === 'string' ? s : (s.nazwa || ''))
+        );
+        if (!hasMeat) continue;
+
+        // Zamień mięso na tofu — zachowaj inne składniki
+        const noweSkl = (posilek.skladniki || []).map(s => {
+          const nazwa = typeof s === 'string' ? s : (s.nazwa || '');
+          if (!MEAT_RE.test(nazwa)) return s;
+          // Wyciągnij gramy z oryginalnego składnika
+          const gMatch = nazwa.match(/(\d+)\s*g/);
+          const g = gMatch ? Math.round(parseInt(gMatch[1]) * 1.3) : 150; // tofu trochę więcej
+          return `tofu ${g}g`;
+        });
+
+        posilek.skladniki = noweSkl;
+        posilek._korygowany_stosunek = `${c.labelA}:${c.labelB}`;
+        const makra = await przeliczMakraPosilku(noweSkl);
+        if (makra) { Object.assign(posilek, makra); posilek.zrodlo_makr = 'baza'; }
+      }
+    }
+  }
+
+  // Przelicz json.mikro po korektach
+  const liczbaDni = json.dni?.length || 1;
+  const sumaM = {};
+  for (const dzien of (json.dni || [])) {
+    for (const p of (dzien.posilki || [])) {
+      for (const pole of mikro_pola) sumaM[pole] = (sumaM[pole] || 0) + (p[pole] || 0);
+    }
+  }
+  json.mikro = json.mikro || {};
+  for (const pole of mikro_pola) json.mikro[pole] = Math.round((sumaM[pole] || 0) / liczbaDni * 10) / 10;
 
   return json;
 }

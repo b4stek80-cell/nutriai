@@ -1152,6 +1152,9 @@ const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let currentUser = null;
 let currentSession = null;
 
+// Status subskrypcji — musi być przed onAuthStateChange
+let isPremium = false;
+
 _supabase.auth.onAuthStateChange((_event, session) => {
   currentSession = session;
   currentUser = session?.user ?? null;
@@ -1236,8 +1239,6 @@ setTimeout(aktualizujStatystykiBazy, 500);
 
 
 // Status subskrypcji — pobierany z backendu po zalogowaniu
-let isPremium = false;
-
 async function pobierzStatusSubskrypcji() {
   if (!BACKEND_URL || !currentSession?.access_token) return;
   try {

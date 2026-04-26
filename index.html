@@ -971,6 +971,9 @@
   <button class="gen-btn" id="genBtn" onclick="generate()">
     ✨ Generuj mój plan żywieniowy
   </button>
+  <div id="limitInfo" style="text-align:center;font-size:11px;color:var(--text2);margin-top:8px;line-height:1.6;">
+    <span id="limitTekst">🎁 5 jadłospisów dziennie za darmo · Limit odnawia się o północy</span>
+  </div>
 </div>
 
 <!-- RESULT SCREEN -->
@@ -1152,6 +1155,9 @@ let currentSession = null;
 _supabase.auth.onAuthStateChange((_event, session) => {
   currentSession = session;
   currentUser = session?.user ?? null;
+  isPremium = false; // reset przy każdej zmianie auth
+  aktualizujLimitInfo();
+  if (currentUser) pobierzStatusSubskrypcji();
   updateAuthUI();
 });
 
@@ -1222,11 +1228,76 @@ let currentResult = null;
 // Init
 updateKeyBtn();
 initChips();
+aktualizujLimitInfo();
 loadSaved();
 loadDiary();
 setTimeout(aktualizujStatystykiBazy, 500);
 
 
+
+// Status subskrypcji — pobierany z backendu po zalogowaniu
+let isPremium = false;
+
+async function pobierzStatusSubskrypcji() {
+  if (!BACKEND_URL || !currentSession?.access_token) return;
+  try {
+    const res = await fetch(`${BACKEND_URL}/me`, {
+      headers: {
+        'Authorization': `Bearer ${currentSession.access_token}`,
+        'X-User-Email': currentUser?.email || ''
+      }
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    isPremium = data.is_premium === true;
+    aktualizujLimitInfo();
+  } catch(e) {
+    console.warn('Nie można pobrać statusu subskrypcji:', e.message);
+  }
+}
+
+// Lokalny licznik generacji (synchronizowany z datą)
+function getLimitInfo() {
+  const dzis = new Date().toDateString();
+  const zapisany = localStorage.getItem('nutriai_gen_date');
+  if (zapisany !== dzis) {
+    localStorage.setItem('nutriai_gen_date', dzis);
+    localStorage.setItem('nutriai_gen_count', '0');
+  }
+  const count = parseInt(localStorage.getItem('nutriai_gen_count') || '0');
+  return { count, pozostalo: Math.max(0, 5 - count) };
+}
+
+function aktualizujLimitInfo() {
+  const el = document.getElementById('limitTekst');
+  if (!el) return;
+
+  // Premium — bez limitu
+  if (isPremium) {
+    el.innerHTML = '✨ Plan Premium · Nielimitowane jadłospisy';
+    el.style.color = '#a78bfa';
+    return;
+  }
+
+  // Free — licznik dzienny
+  const { pozostalo } = getLimitInfo();
+  if (pozostalo === 0) {
+    el.innerHTML = '⏰ Dzienny limit wyczerpany · Odnowi się o północy';
+    el.style.color = '#fb923c';
+  } else if (pozostalo <= 2) {
+    el.innerHTML = `⚡ Pozostało <strong style="color:#fb923c">${pozostalo}</strong> z 5 darmowych jadłospisów dziś`;
+    el.style.color = 'var(--text2)';
+  } else {
+    el.innerHTML = `🎁 Pozostało <strong style="color:var(--green)">${pozostalo}</strong> z 5 darmowych jadłospisów dziś`;
+    el.style.color = 'var(--text2)';
+  }
+}
+
+function zwiększLicznikGeneracji() {
+  const count = parseInt(localStorage.getItem('nutriai_gen_count') || '0');
+  localStorage.setItem('nutriai_gen_count', String(count + 1));
+  aktualizujLimitInfo();
+}
 
 function updateKeyBtn() {}
 
@@ -2020,6 +2091,7 @@ Nazwy posiłków max 5 słów. 5 wskazówek żywieniowych.`;
       date: new Date().toLocaleDateString('pl')
     };
     renderResult(jsonWeryfikowany);
+    zwiększLicznikGeneracji();
 
   } catch(e) {
     clearInterval(msgInterval);
@@ -2375,11 +2447,12 @@ function renderResult(json) {
 
       meal.innerHTML = html;
 
-      // Przycisk "Wymień posiłek"
+      // Przycisk "Wymień posiłek" z limitem 3 wymian
       const swapBtn = document.createElement('button');
       swapBtn.className = 'swap-btn';
       swapBtn.innerHTML = '🔄 Wymień posiłek';
       swapBtn.title = 'Wygeneruj inny posiłek o tych samych makrach';
+      swapBtn.dataset.swapCount = '0';
       swapBtn.onclick = () => wymienPosilek(m, day, swapBtn, meal, json, params, card);
       meal.appendChild(swapBtn);
 
@@ -2845,8 +2918,61 @@ function exportToFile() {
 }
 
 // ============================================================
-// LISTA ZAKUPÓW
+// MIKROPANEL PER POSIŁEK — używany przy renderze i po wymianie
 // ============================================================
+function dodajMikroPanelDoPosilku(meal, m) {
+  const mikroPolaPosilku = ['wapn_mg','fosfor_mg','magnez_mg','potas_mg','sod_mg','zelazo_mg','cynk_mg','omega3_g','vit_c_mg','vit_d_ug','vit_b12_ug','folany_ug','selen_ug','jod_ug','nas_g'];
+  const maMikro = mikroPolaPosilku.some(f => (m[f] || 0) > 0);
+  if (!maMikro) return;
+
+  const r1m = v => Math.round(v * 10) / 10;
+  const caP = m.fosfor_mg > 1 ? (m.wapn_mg / m.fosfor_mg).toFixed(2) : null;
+  const caPColor = caP && Math.abs(parseFloat(caP) - 1) < 0.3 ? '#34d399' : '#fb923c';
+  const badge = (label, val, unit, bg, color) =>
+    val > 0 ? `<span style="padding:2px 7px;border-radius:12px;background:${bg};color:${color}">${label}: ${r1m(val)}${unit}</span>` : '';
+
+  const mikroBtnP = document.createElement('button');
+  mikroBtnP.style.cssText = 'width:100%;margin-top:5px;padding:4px;background:rgba(96,165,250,0.06);border:1px solid rgba(96,165,250,0.15);border-radius:8px;color:var(--accent2);font-size:10px;cursor:pointer;text-align:left;';
+  mikroBtnP.innerHTML = '🔬 Składniki mineralne i witaminy ▾';
+
+  const mikroPanelP = document.createElement('div');
+  mikroPanelP.style.cssText = 'display:none;margin-top:4px;padding:10px;background:var(--bg3);border-radius:8px;font-size:10px;';
+  mikroPanelP.innerHTML = `
+    <div style="font-size:9px;color:var(--text2);font-weight:600;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.05em;">🧱 Minerały</div>
+    <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;">
+      ${badge('Ca',  m.wapn_mg,   'mg', 'rgba(52,211,153,0.1)',  '#6ee7b7')}
+      ${badge('P',   m.fosfor_mg, 'mg', 'rgba(52,211,153,0.1)',  '#6ee7b7')}
+      ${caP ? `<span style="padding:2px 7px;border-radius:12px;background:rgba(52,211,153,0.08);color:${caPColor};font-weight:600">Ca:P = ${caP}</span>` : ''}
+      ${badge('Mg',  m.magnez_mg, 'mg', 'rgba(124,106,247,0.1)', '#a78bfa')}
+      ${badge('K',   m.potas_mg,  'mg', 'rgba(124,106,247,0.1)', '#a78bfa')}
+      ${badge('Na',  m.sod_mg,    'mg', 'rgba(251,146,60,0.1)',  '#fb923c')}
+      ${badge('Fe',  m.zelazo_mg, 'mg', 'rgba(251,146,60,0.1)',  '#fb923c')}
+      ${badge('Zn',  m.cynk_mg,   'mg', 'rgba(251,146,60,0.1)',  '#fb923c')}
+      ${badge('Se',  m.selen_ug,  'µg', 'rgba(251,146,60,0.1)',  '#fb923c')}
+      ${badge('I',   m.jod_ug,    'µg', 'rgba(251,146,60,0.1)',  '#fb923c')}
+    </div>
+    <div style="font-size:9px;color:var(--text2);font-weight:600;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.05em;">💊 Witaminy</div>
+    <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;">
+      ${badge('Wit.C',   m.vit_c_mg,  'mg', 'rgba(250,204,21,0.1)',  '#fbbf24')}
+      ${badge('Wit.D',   m.vit_d_ug,  'µg', 'rgba(250,204,21,0.1)',  '#fbbf24')}
+      ${badge('Wit.B12', m.vit_b12_ug,'µg', 'rgba(250,204,21,0.1)',  '#fbbf24')}
+      ${badge('Fol',     m.folany_ug, 'µg', 'rgba(250,204,21,0.1)',  '#fbbf24')}
+    </div>
+    <div style="font-size:9px;color:var(--text2);font-weight:600;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.05em;">🫀 Tłuszcze</div>
+    <div style="display:flex;flex-wrap:wrap;gap:5px;">
+      ${badge('Omega-3', m.omega3_g, 'g', 'rgba(96,165,250,0.1)', '#60a5fa')}
+      ${badge('Nas',     m.nas_g,    'g', 'rgba(251,146,60,0.1)', '#fb923c')}
+    </div>`;
+
+  mikroBtnP.onclick = () => {
+    const open = mikroPanelP.style.display !== 'none';
+    mikroPanelP.style.display = open ? 'none' : 'block';
+    mikroBtnP.innerHTML = `🔬 Składniki mineralne i witaminy ${open ? '▾' : '▴'}`;
+  };
+
+  meal.appendChild(mikroBtnP);
+  meal.appendChild(mikroPanelP);
+}
 function generateShoppingList(json) {
   const kategorie = {
     'mięso':       ['kurczak','indyk','wołowina','wieprzowina','schab','boczek','kiełbasa','szynka','polędwica'],
@@ -3172,6 +3298,12 @@ function saveDiaryEntry(date) {
 // WYMIEŃ POSIŁEK — zamień jeden posiłek zachowując makra
 // ============================================================
 async function wymienPosilek(posilek, dzien, btn, mealEl, json, params, card) {
+  const MAX_SWAP = 3;
+  const swapCount = parseInt(btn.dataset.swapCount || '0');
+  if (swapCount >= MAX_SWAP) {
+    showToast(`⚠️ Maksymalnie ${MAX_SWAP} wymiany tego posiłku`);
+    return;
+  }
   
 
   btn.disabled = true;
@@ -3257,15 +3389,47 @@ Zwróć TYLKO JSON:
     }
     mealEl.innerHTML = html;
 
-    // Dodaj nowy przycisk wymień
+    // Dodaj panel mikroskładników dla nowego posiłku
+    dodajMikroPanelDoPosilku(mealEl, nowyPosilek);
+
+    // Dodaj nowy przycisk wymień z aktualnym licznikiem
     const newSwapBtn = document.createElement('button');
     newSwapBtn.className = 'swap-btn';
-    newSwapBtn.innerHTML = '🔄 Wymień posiłek';
-    newSwapBtn.onclick = () => wymienPosilek(nowyPosilek, dzien, newSwapBtn, mealEl, json, params, card);
+    const nowyCount = swapCount + 1;
+    const pozostalo = MAX_SWAP - nowyCount;
+    newSwapBtn.dataset.swapCount = String(nowyCount);
+    newSwapBtn.innerHTML = pozostalo > 0
+      ? `🔄 Wymień posiłek <span style="font-size:9px;opacity:0.6">(${pozostalo} ${pozostalo===1?'zmiana':'zmiany'})</span>`
+      : `🔄 Wymień posiłek <span style="font-size:9px;opacity:0.6">(limit)</span>`;
+    if (pozostalo === 0) {
+      newSwapBtn.disabled = true;
+      newSwapBtn.style.opacity = '0.4';
+      newSwapBtn.style.cursor = 'default';
+      newSwapBtn.title = 'Osiągnięto limit wymian tego posiłku';
+    } else {
+      newSwapBtn.onclick = () => wymienPosilek(nowyPosilek, dzien, newSwapBtn, mealEl, json, params, card);
+      newSwapBtn.title = 'Wygeneruj inny posiłek o tych samych makrach';
+    }
     mealEl.appendChild(newSwapBtn);
 
     // Aktualizuj sumę kcal w headerze dnia
     if (card?._aktualizujHeader) card._aktualizujHeader();
+
+    // Aktualizuj zbiorczy mikropanel dnia jeśli istnieje
+    const dayCard = mealEl.closest('.day-card');
+    if (dayCard) {
+      const mikroDniaEl = dayCard.querySelector('.mikro-dnia-panel');
+      if (mikroDniaEl) {
+        const mikroPola = ['wapn_mg','fosfor_mg','magnez_mg','potas_mg','sod_mg','zelazo_mg','cynk_mg','omega3_g','blonnik_g','vit_c_mg','vit_d_ug','vit_b12_ug','folany_ug','selen_ug','jod_ug','nas_g'];
+        const sumDnia = {};
+        dzien.posilki.forEach(p => mikroPola.forEach(f => { sumDnia[f] = (sumDnia[f]||0) + (p[f]||0); }));
+        // Odśwież etykiety w panelu dnia
+        mikroPola.forEach(f => {
+          const el = mikroDniaEl.querySelector(`[data-mikro="${f}"]`);
+          if (el) el.textContent = Math.round((sumDnia[f]||0) * 10) / 10;
+        });
+      }
+    }
 
     showToast(`✅ Zamieniono na: ${nowyPosilek.nazwa}`);
 

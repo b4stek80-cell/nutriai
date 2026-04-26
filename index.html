@@ -801,6 +801,7 @@
     <button id="btn-login" class="auth-btn" onclick="handleLogin()">Zaloguj</button>
     <div id="user-info">
       <img id="user-avatar" class="user-avatar" src="" alt="avatar">
+      <span id="premiumBadge" style="display:none;font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(124,106,247,0.2);color:#a78bfa;font-weight:700;">⭐ Premium</span>
       <button class="auth-btn auth-btn-sm" onclick="handleLogout()">Wyloguj</button>
     </div>
   </div>
@@ -1135,6 +1136,27 @@
 
 <!-- KEY MODAL -->
 
+<!-- PREMIUM MODAL -->
+<div id="premiumModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.7);backdrop-filter:blur(6px);align-items:center;justify-content:center;">
+  <div style="background:#1e2535;border:1px solid rgba(124,106,247,0.3);border-radius:20px;padding:36px 32px;max-width:420px;width:90%;text-align:center;box-shadow:0 24px 80px rgba(0,0,0,0.5);">
+    <div style="font-size:42px;margin-bottom:12px;">⭐</div>
+    <h2 style="font-size:22px;font-weight:800;margin-bottom:10px;">Wyczerpałeś dzienny limit</h2>
+    <p style="color:#94a3b8;font-size:14px;margin-bottom:24px;">Bezpłatny plan umożliwia generowanie <strong style="color:#e2e8f0">5 jadłospisów dziennie</strong>. Wróć jutro lub przejdź na Premium.</p>
+    <div style="background:rgba(124,106,247,0.08);border:1px solid rgba(124,106,247,0.2);border-radius:14px;padding:20px;margin-bottom:24px;text-align:left;">
+      <div style="font-size:13px;font-weight:700;color:#a78bfa;margin-bottom:12px;">✨ Plan Premium — 19 zł/mies</div>
+      <div style="display:flex;flex-direction:column;gap:8px;font-size:13px;">
+        <div>✓ <strong>Bez limitu</strong> jadłospisów</div>
+        <div>✓ Wszystkie funkcje AI</div>
+        <div>✓ Minerały i witaminy per posiłek</div>
+        <div>✓ Anuluj kiedy chcesz</div>
+      </div>
+      <div style="margin-top:16px;font-size:28px;font-weight:800;">19 <span style="font-size:16px;font-weight:500;color:#94a3b8">zł/mies</span></div>
+    </div>
+    <button id="btnKupPremium" onclick="rozpocznijPlatnosc()" style="width:100%;padding:14px;background:#7c6af7;color:#fff;border:none;border-radius:24px;font-size:16px;font-weight:700;cursor:pointer;margin-bottom:10px;">Kup Premium</button>
+    <button onclick="zamknijModalPremium()" style="width:100%;padding:11px;background:transparent;color:#94a3b8;border:1px solid rgba(255,255,255,0.1);border-radius:24px;font-size:14px;cursor:pointer;">Może później</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1252,6 +1274,8 @@ async function pobierzStatusSubskrypcji() {
     const data = await res.json();
     isPremium = data.is_premium === true;
     aktualizujLimitInfo();
+    const badge = document.getElementById('premiumBadge');
+    if (badge) badge.style.display = isPremium ? 'inline-block' : 'none';
   } catch(e) {
     console.warn('Nie można pobrać statusu subskrypcji:', e.message);
   }
@@ -1300,6 +1324,58 @@ function zwiększLicznikGeneracji() {
   aktualizujLimitInfo();
 }
 
+function pokazModalPremium() {
+  const modal = document.getElementById('premiumModal');
+  modal.style.display = 'flex';
+}
+
+function zamknijModalPremium() {
+  document.getElementById('premiumModal').style.display = 'none';
+}
+
+async function rozpocznijPlatnosc() {
+  if (!currentUser) {
+    zamknijModalPremium();
+    showToast('⚠️ Zaloguj się żeby kupić Premium');
+    await handleLogin();
+    return;
+  }
+  const btn = document.getElementById('btnKupPremium');
+  btn.textContent = 'Przekierowuję do Stripe...';
+  btn.disabled = true;
+  try {
+    const res = await fetch(`${BACKEND_URL}/create-checkout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }
+    });
+    const data = await res.json();
+    if (data.url) {
+      window.location.href = data.url;
+    } else {
+      showToast('❌ Błąd płatności: ' + (data.error || 'spróbuj ponownie'));
+      btn.textContent = 'Kup Premium';
+      btn.disabled = false;
+    }
+  } catch (e) {
+    showToast('❌ Błąd połączenia');
+    btn.textContent = 'Kup Premium';
+    btn.disabled = false;
+  }
+}
+
+// Obsługa powrotu ze Stripe
+(function handleStripeReturn() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('payment') === 'success') {
+    showToast('🎉 Plan Premium aktywowany!');
+    setTimeout(pobierzStatusSubskrypcji, 2000);
+    window.history.replaceState({}, '', window.location.pathname);
+  } else if (params.get('payment') === 'cancel') {
+    showToast('Płatność anulowana');
+    window.history.replaceState({}, '', window.location.pathname);
+  }
+})();
+
 function updateKeyBtn() {}
 
 function initChips() {
@@ -1313,6 +1389,26 @@ function initChips() {
           const val = chip.dataset.val;
           document.getElementById('clinicalBlock').style.display =
             val === 'kliniczny' ? 'block' : 'none';
+          // Modal ostrzeżenia o lekach — przy pierwszym wyborze trybu
+          if (val === 'kliniczny' && !localStorage.getItem('nutriai_lek_warn')) {
+            localStorage.setItem('nutriai_lek_warn', '1');
+            const warn = document.createElement('div');
+            warn.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+            warn.innerHTML = `<div style="background:var(--card);border:1px solid rgba(251,146,60,0.3);border-radius:20px;max-width:360px;width:100%;padding:24px;">
+              <div style="font-size:28px;text-align:center;margin-bottom:12px;">⚕️</div>
+              <div style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:10px;text-align:center;">Tryb Specjalistyczny</div>
+              <div style="font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:16px;">
+                Plan żywieniowy uwzględnia ogólne wskazówki dla wybranego schorzenia.
+                <br><br>
+                <strong style="color:#fb923c">⚠️ Ważne przy lekach:</strong><br>
+                Jeśli przyjmujesz <strong>metforminę, lewotyroksynę, warfarynę lub inne leki przewlekłe</strong> — skonsultuj jadłospis z lekarzem lub dietetykiem. Niektóre produkty mogą wpływać na wchłanianie lub skuteczność leków.
+                <br><br>
+                <span style="font-size:11px;color:var(--text2);opacity:0.7">Ten plan jest inspiracją żywieniową, nie zaleceniem medycznym.</span>
+              </div>
+              <button onclick="this.closest('[style*=fixed]').remove()" style="width:100%;padding:13px;background:linear-gradient(135deg,var(--accent),#5b4dd4);border:none;border-radius:12px;color:#fff;font-size:14px;font-weight:600;cursor:pointer;">Rozumiem, kontynuuję</button>
+            </div>`;
+            document.body.appendChild(warn);
+          }
         }
         // Walidacja miękka przy każdej zmianie chipa
         walidujFormularz();
@@ -1663,9 +1759,14 @@ async function generate() {
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
           const msg = err.error || err.error?.message || `HTTP ${res.status}`;
-          // 429 od własnego backendu = dzienny limit — nie ponawiaj
-          const isDailyLimit = res.status === 429 && msg.toString().includes('limit');
-          if (!isDailyLimit && (res.status === 503 || res.status === 429 || res.status === 500) && attempt < MAX_RETRIES) {
+          // 429 od własnego backendu = dzienny limit — pokaż modal Premium
+          if (res.status === 429) {
+            clearInterval(msgInterval);
+            document.getElementById('loader').style.display = 'none';
+            pokazModalPremium();
+            throw new Error('Dzienny limit jadłospisów wyczerpany.');
+          }
+          if ((res.status === 503 || res.status === 500) && attempt < MAX_RETRIES) {
             document.getElementById('loaderText').textContent =
               `Serwer zajęty — próba ${attempt+1}/${MAX_RETRIES}...`;
             await new Promise(r => setTimeout(r, RETRY_DELAY * attempt));
@@ -1706,7 +1807,7 @@ async function generate() {
         'insulinoopornosc':      'Insulinooporność. Niski IG, ogranicz węglowodany proste, zwiększ białko i błonnik. Unikaj: cukru, produktów wysokoprzetworzonych, słodkich owoców w nadmiarze.',
         'hashimoto':             'Choroba Hashimoto. Unikaj glutenu i nabiału (stan zapalny), ogranicz goitrogeny (kapusta, brokuł surowy), zwiększ selen (orzechy brazylijskie, ryby), cynk, witaminę D.',
         'celiakia':              'Celiakia. BEZWZGLĘDNIE bezglutenowe — zero pszenicy, żyta, jęczmienia, owsa (chyba że certyfikowany bezglutenowy). Używaj: ryżu, ziemniaków, quinoa, kaszy gryczanej, mąki kukurydzianej.',
-        'ibs':                   'Zespół jelita drażliwego (IBS). Dieta low-FODMAP: unikaj cebuli, czosnku, jabłek, gruszek, mleka krowiego, strączków, pszenicy. Zalecaj: ryż, marchew, banan, kurczak, jajka, ser bez laktozy.',
+        'ibs':                   'Zespół jelita drażliwego (IBS). Dieta low-FODMAP (faza eliminacji): unikaj cebuli, czosnku, jabłek, gruszek, mleka krowiego, strączków, pszenicy. Zalecaj: ryż, marchew, banan (niedojrzały), kurczak, jajka, ser bez laktozy. WAŻNE: Ogranicz błonnik nierozpuszczalny — max 15g/dzień. Preferuj błonnik rozpuszczalny (owies, marchew, banany). Unikaj surowych warzyw — wybieraj gotowane.',
         'nadcisnienie':          'Nadciśnienie tętnicze. Dieta DASH: ogranicz sód (<2300mg), zwiększ potas (banany, ziemniaki, szpinak), magnez, wapń. Unikaj: soli, przetworów, fast-food, alkoholu.',
         'hipercholesterolemia':  'Hipercholesterolemia. Ogranicz tłuszcze nasycone i trans, zwiększ błonnik rozpuszczalny (owsianka, jabłka, fasola), omega-3 (łosoś, orzechy). Unikaj: tłustego mięsa, masła, pełnotłustego nabiału.',
         'niedoczynnosc_tarczycy':'Niedoczynność tarczycy. Zwiększ jod (ryby morskie, nabiał), selen, cynk. Ogranicz goitrogeny na surowo (kapusta, brokuł — gotowane OK). Unikaj soi w nadmiarze.'
@@ -1793,7 +1894,18 @@ Zasady bezwzględne:
     if (diet === 'ketogeniczna')   { bPct = 0.25; tPct = 0.65; wPct = 0.10; }
     if (diet === 'dabrowska')      { bPct = 0.08; tPct = 0.05; wPct = 0.87; }
 
-    const doceloweBialko = Math.round((doceloweKcal * bPct) / 4);
+    // ESPEN 2018: osoby 65+ potrzebują więcej białka (1.8g/kg vs 1.6g)
+    // Sprawdzamy czy wyliczone białko spełnia minimum — jeśli nie, korygujemy
+    let doceloweBialko = Math.round((doceloweKcal * bPct) / 4);
+    if (age >= 65 && diet !== 'dabrowska' && diet !== 'ketogeniczna') {
+      const minBialko65 = Math.round(weight * 1.8);
+      if (doceloweBialko < minBialko65) {
+        doceloweBialko = minBialko65;
+        // Korekta bPct dla spójności z promptem
+        bPct = (doceloweBialko * 4) / doceloweKcal;
+        wPct = Math.max(0.25, wPct - (bPct - 0.25));
+      }
+    }
     const doceloweTluszcze = Math.round((doceloweKcal * tPct) / 9);
     const doceloweWegl = Math.round((doceloweKcal * wPct) / 4);
 
@@ -1865,6 +1977,8 @@ ZŁOTE ZASADY DIETETYCZNE (IŻŻ / WHO / Piramida Żywienia):
 • Strączkowe min. 3x w tygodniu — soczewica, ciecierzyca, fasola, tofu
 • Ogranicz sól — nie dodawaj osobno, używaj ziół i przypraw
 • Zróżnicowanie białka — naprzemiennie: mięso, ryby, jajka, rośliny strączkowe
+${age >= 65 ? '• SENIOR (65+): zwiększone białko — minimum 30g białka na każdy główny posiłek, miękkie produkty łatwe do gryzienia i trawienia' : ''}
+${(disease === 'cukrzyca_t2' || disease === 'insulinoopornosc') ? '• WAŻNE — ŁADUNEK GLIKEMICZNY: maksymalnie 45g węglowodanów na posiłek, rozłóż węglowodany równomiernie przez cały dzień, zawsze łącz węglowodany z białkiem i błonnikiem' : ''}
 
 Zwróć TYLKO JSON:
 {"wskazowki":["string","string","string","string","string"],"dni":[{"dzien":"string","posilki":[{"pora":"string","nazwa":"string","skladniki":[{"nazwa":"nazwa z bazy IŻŻ","procent_kcal":number}]}]}]}
@@ -2088,7 +2202,8 @@ Nazwy posiłków max 5 słów. 5 wskazówek żywieniowych.`;
                 bmi: Math.round(bmi*10)/10,
                 deficyt: korekta,
                 doceloweBialko, doceloweTluszcze, doceloweWegl,
-                pacjentNazwa: document.getElementById('pacjentNazwa')?.value?.trim() || '' },
+                pacjentNazwa: document.getElementById('pacjentNazwa')?.value?.trim() || '',
+                wytyczneKliniczne: document.getElementById('wytyczneKliniczne')?.value?.trim() || '' },
       date: new Date().toLocaleDateString('pl')
     };
     renderResult(jsonWeryfikowany);
@@ -2166,9 +2281,21 @@ function renderResult(json) {
     };
     const warn = document.createElement('div');
     warn.className = 'clinical-warn';
-    warn.innerHTML = `<strong>⚕️ Tryb kliniczny: ${diseaseNames[disease]||disease}</strong><br>
+
+    // Dodatkowe info specyficzne dla schorzenia
+    const extraInfo = {
+      'ibs': '<br><span style="font-size:11px;opacity:0.85">📌 Plan oparty na <strong>fazie eliminacji low-FODMAP</strong> (Monash University). Błonnik ograniczony do ~15g/dzień — przy IBS nadmiar błonnika nierozpuszczalnego może nasilać objawy. Faza reintrodukcji — stopniowe przywracanie produktów — wymaga indywidualnej pracy z dietetykiem.</span>',
+      'hashimoto': '<br><span style="font-size:11px;opacity:0.85">📌 <strong>Ważne przy lewotyroksynie:</strong> żelazo, wapń i magnez przyjmuj min. 4 godziny od leku. Kawa i błonnik również opóźniają wchłanianie.</span>',
+      'niedoczynnosc_tarczycy': '<br><span style="font-size:11px;opacity:0.85">📌 <strong>Ważne przy lewotyroksynie:</strong> żelazo, wapń i magnez przyjmuj min. 4 godziny od leku. Soja może zaburzać wchłanianie hormonu.</span>',
+      'cukrzyca_t2': '<br><span style="font-size:11px;opacity:0.85">📌 Plan uwzględnia niski ładunek glikemiczny i równomierne rozłożenie węglowodanów. Monitoruj glikemię i skonsultuj z diabetologiem.</span>',
+      'insulinoopornosc': '<br><span style="font-size:11px;opacity:0.85">📌 Plan uwzględnia niski ładunek glikemiczny. Pora posiłków i aktywność fizyczna są równie ważne jak skład diety.</span>',
+      'nadcisnienie': '<br><span style="font-size:11px;opacity:0.85">📌 Dieta DASH — sód ograniczony do 1500mg/dzień. Regularnie monitoruj ciśnienie.</span>',
+    };
+
+    warn.innerHTML = `<strong>⚕️ Tryb specjalistyczny: ${diseaseNames[disease]||disease}</strong><br>
       Jadłospis uwzględnia ogólne wskazówki żywieniowe dla tego schorzenia.
-      <strong>Ten plan jest wyłącznie inspiracją</strong> — przy schorzeniach zawsze skonsultuj dietę z dyplomowanym dietetykiem lub lekarzem.`;
+      <strong>Ten plan jest wyłącznie inspiracją</strong> — przy schorzeniach zawsze skonsultuj dietę z dyplomowanym dietetykiem lub lekarzem.
+      ${extraInfo[disease] || ''}`;
     area.appendChild(warn);
   }
   if (mode === 'ciaza') {
@@ -2316,6 +2443,21 @@ function renderResult(json) {
         <span style="font-size:11px;padding:3px 9px;border-radius:20px;background:rgba(248,113,113,0.1);color:#fca5a5">Zn: ${json.mikro.cynk_mg}mg</span>
       </div>
     </div>` : ''}
+    ${params.weight ? (() => {
+      // Nawodnienie wg WHO: 30-35ml/kg, korekta na aktywność
+      const pal = params.activity || 1.375;
+      const mnoznik = pal >= 1.55 ? 35 : 30;
+      const woda = Math.round(params.weight * mnoznik / 100) / 10;
+      const wodaMin = Math.round(params.weight * 30 / 100) / 10;
+      const wodaMax = Math.round(params.weight * 35 / 100) / 10;
+      return `<div style="margin-top:10px;padding:10px 12px;background:rgba(96,165,250,0.08);border:1px solid rgba(96,165,250,0.2);border-radius:10px;display:flex;align-items:center;gap:10px;">
+        <span style="font-size:20px;">💧</span>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--text)">Zalecane nawodnienie: <strong style="color:#60a5fa">${woda} l/dzień</strong></div>
+          <div style="font-size:10px;color:var(--text2);margin-top:2px">Zakres: ${wodaMin}–${wodaMax} l · Wzór WHO: 30–35 ml/kg m.c. · pamiętaj o dodatkowym nawodnieniu po treningu</div>
+        </div>
+      </div>`;
+    })() : ''}
   `;
   area.appendChild(summary);
 
@@ -2360,7 +2502,9 @@ function renderResult(json) {
 
   // Panel mikroskładników z normami IŻŻ
   if (json.mikro && currentResult?.params) {
-    area.appendChild(renderMikroPanel(json, currentResult.params));
+    const panelMikro = renderMikroPanel(json, currentResult.params);
+    panelMikro.id = 'mikroPanelGlobalny';
+    area.appendChild(panelMikro);
   }
 
   // Action buttons
@@ -2531,7 +2675,7 @@ function renderResult(json) {
 
     // Mikroskładniki dnia — zwijana sekcja
     const sumDnia = {};
-    const mikroPola = ['wapn_mg','fosfor_mg','magnez_mg','potas_mg','sod_mg','zelazo_mg','cynk_mg','omega3_g','blonnik_g'];
+    const mikroPola = ['wapn_mg','fosfor_mg','magnez_mg','potas_mg','sod_mg','zelazo_mg','cynk_mg','selen_ug','jod_ug','omega3_g','blonnik_g','vit_c_mg','vit_d_ug','vit_b12_ug','folany_ug'];
     day.posilki.forEach(p => mikroPola.forEach(f => { sumDnia[f] = (sumDnia[f]||0) + (p[f]||0); }));
     const majakieDane = mikroPola.some(f => (sumDnia[f]||0) > 0);
 
@@ -2547,9 +2691,11 @@ function renderResult(json) {
       mikroBtn.innerHTML = '🔬 Minerały i witaminy dnia ▾';
 
       const mikroPanel = document.createElement('div');
+      mikroPanel.className = 'mikro-dnia-panel';
       mikroPanel.style.cssText = 'display:none;margin-top:6px;padding:10px;background:var(--bg3);border-radius:8px;font-size:11px;';
       mikroPanel.innerHTML = `
-        <div style="display:flex;flex-wrap:wrap;gap:6px;">
+        <div style="font-size:9px;color:var(--text2);font-weight:600;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.05em;">🧱 Minerały</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;">
           ${sumDnia.wapn_mg   > 0 ? `<span style="padding:3px 8px;border-radius:12px;background:rgba(52,211,153,0.1);color:#6ee7b7">Ca: ${Math.round(sumDnia.wapn_mg)}mg</span>` : ''}
           ${sumDnia.fosfor_mg > 0 ? `<span style="padding:3px 8px;border-radius:12px;background:rgba(52,211,153,0.1);color:#6ee7b7">P: ${Math.round(sumDnia.fosfor_mg)}mg</span>` : ''}
           ${sumDnia.wapn_mg > 0 && sumDnia.fosfor_mg > 1 ? `<span style="padding:3px 8px;border-radius:12px;background:rgba(52,211,153,0.08);color:${caPColor};font-weight:600">Ca:P = ${caP}</span>` : ''}
@@ -2558,6 +2704,18 @@ function renderResult(json) {
           ${sumDnia.sod_mg    > 0 ? `<span style="padding:3px 8px;border-radius:12px;background:rgba(251,146,60,0.1);color:#fb923c">Na: ${Math.round(sumDnia.sod_mg)}mg</span>` : ''}
           ${sumDnia.zelazo_mg > 0 ? `<span style="padding:3px 8px;border-radius:12px;background:rgba(251,146,60,0.1);color:#fb923c">Fe: ${r1m(sumDnia.zelazo_mg)}mg</span>` : ''}
           ${sumDnia.cynk_mg   > 0 ? `<span style="padding:3px 8px;border-radius:12px;background:rgba(251,146,60,0.1);color:#fb923c">Zn: ${r1m(sumDnia.cynk_mg)}mg</span>` : ''}
+          ${sumDnia.selen_ug  > 0 ? `<span style="padding:3px 8px;border-radius:12px;background:rgba(251,146,60,0.1);color:#fb923c">Se: ${r1m(sumDnia.selen_ug)}µg</span>` : ''}
+          ${sumDnia.jod_ug    > 0 ? `<span style="padding:3px 8px;border-radius:12px;background:rgba(251,146,60,0.1);color:#fb923c">I: ${r1m(sumDnia.jod_ug)}µg</span>` : ''}
+        </div>
+        <div style="font-size:9px;color:var(--text2);font-weight:600;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.05em;">💊 Witaminy</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;">
+          ${sumDnia.vit_c_mg  > 0 ? `<span style="padding:3px 8px;border-radius:12px;background:rgba(250,204,21,0.1);color:#fbbf24">Wit.C: ${r1m(sumDnia.vit_c_mg)}mg</span>` : ''}
+          ${sumDnia.vit_d_ug  > 0 ? `<span style="padding:3px 8px;border-radius:12px;background:rgba(250,204,21,0.1);color:#fbbf24">Wit.D: ${r1m(sumDnia.vit_d_ug)}µg</span>` : ''}
+          ${sumDnia.vit_b12_ug > 0 ? `<span style="padding:3px 8px;border-radius:12px;background:rgba(250,204,21,0.1);color:#fbbf24">Wit.B12: ${r1m(sumDnia.vit_b12_ug)}µg</span>` : ''}
+          ${sumDnia.folany_ug > 0 ? `<span style="padding:3px 8px;border-radius:12px;background:rgba(250,204,21,0.1);color:#fbbf24">Fol: ${r1m(sumDnia.folany_ug)}µg</span>` : ''}
+        </div>
+        <div style="font-size:9px;color:var(--text2);font-weight:600;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.05em;">🫀 Tłuszcze</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px;">
           ${sumDnia.omega3_g  > 0 ? `<span style="padding:3px 8px;border-radius:12px;background:rgba(96,165,250,0.1);color:#60a5fa">ω-3: ${r1m(sumDnia.omega3_g)}g</span>` : ''}
           ${sumDnia.blonnik_g > 0 ? `<span style="padding:3px 8px;border-radius:12px;background:rgba(96,165,250,0.1);color:#60a5fa">Błon: ${r1m(sumDnia.blonnik_g)}g</span>` : ''}
         </div>`;
@@ -3052,10 +3210,11 @@ function generateShoppingList(json) {
 
   // Przyciski akcji
   const btns = document.createElement('div');
-  btns.style.cssText = 'display:flex;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.06)';
+  btns.style.cssText = 'display:flex;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.06);flex-wrap:wrap;';
   btns.innerHTML = `
-    <button onclick="exportShoppingList()" style="flex:1;padding:11px;background:var(--accent);border:none;border-radius:var(--radius-sm);color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">📄 Eksportuj</button>
-    <button onclick="clearChecked()" style="flex:1;padding:11px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text2);font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif">🗑️ Wyczyść haczy</button>`;
+    <button onclick="exportShoppingList()" style="flex:1;min-width:120px;padding:11px;background:var(--accent);border:none;border-radius:var(--radius-sm);color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">📥 Pobierz .txt</button>
+    <button onclick="kopiujListeZakupow()" style="flex:1;min-width:120px;padding:11px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">📋 Kopiuj</button>
+    <button onclick="clearChecked()" style="flex:1;min-width:120px;padding:11px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text2);font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif">🗑️ Wyczyść haczy</button>`;
   header.appendChild(btns);
   shopContent.appendChild(header);
 }
@@ -3069,21 +3228,57 @@ function clearChecked() {
 }
 
 function exportShoppingList() {
-  const items = [];
-  document.querySelectorAll('.shopping-item').forEach(el => {
-    const name = el.querySelector('span:not(.shopping-amount)').textContent;
-    const amount = el.querySelector('.shopping-amount').textContent;
-    const done = el.classList.contains('checked') ? '✓' : '○';
-    items.push(`${done} ${name} — ${amount}`);
+  const sekcje = [];
+  document.querySelectorAll('.shopping-section .shopping-category, .shopping-section .shopping-item').forEach(el => {
+    if (el.classList.contains('shopping-category')) {
+      sekcje.push('\n' + el.textContent.trim());
+      sekcje.push('-'.repeat(25));
+    } else {
+      const name   = el.querySelector('span:not(.shopping-amount):not(.shopping-check)')?.textContent || '';
+      const amount = el.querySelector('.shopping-amount')?.textContent || '';
+      const done   = el.classList.contains('checked') ? '✓' : '○';
+      if (name) sekcje.push(`${done} ${name} — ${amount}`);
+    }
   });
-  if (!items.length) { showToast('⚠️ Brak listy zakupów'); return; }
-  const text = 'LISTA ZAKUPÓW — NutriAI\n' + '='.repeat(30) + '\n\n' + items.join('\n');
+  if (!sekcje.length) { showToast('⚠️ Brak listy zakupów'); return; }
+  const date = new Date().toLocaleDateString('pl');
+  const text = `LISTA ZAKUPÓW — NutriAI\nData: ${date}\n${'='.repeat(30)}${sekcje.join('\n')}\n\n— wygenerowano przez NutriAI`;
   const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = 'lista-zakupow.txt'; a.click();
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = `lista-zakupow-${date.replace(/\./g,'-')}.txt`; a.click();
   URL.revokeObjectURL(url);
-  showToast('📄 Lista pobrana!');
+  showToast('📥 Lista pobrana!');
+}
+
+async function kopiujListeZakupow() {
+  const linie = [];
+  document.querySelectorAll('.shopping-section .shopping-category, .shopping-section .shopping-item').forEach(el => {
+    if (el.classList.contains('shopping-category')) {
+      linie.push('\n' + el.textContent.trim());
+    } else {
+      const name   = el.querySelector('span:not(.shopping-amount):not(.shopping-check)')?.textContent || '';
+      const amount = el.querySelector('.shopping-amount')?.textContent || '';
+      const done   = el.classList.contains('checked') ? '✓' : '○';
+      if (name) linie.push(`${done} ${name} — ${amount}`);
+    }
+  });
+  if (!linie.length) { showToast('⚠️ Brak listy zakupów'); return; }
+  const text = `🛒 Lista zakupów NutriAI\n${linie.join('\n')}`;
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast('📋 Skopiowano do schowka!');
+  } catch(e) {
+    // Fallback dla starszych przeglądarek
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;opacity:0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('📋 Skopiowano do schowka!');
+  }
 }
 
 // ============================================================
@@ -3347,10 +3542,28 @@ Zwróć TYLKO JSON:
     if (!text) throw new Error('Pusta odpowiedź API');
     const nowyPosilek = JSON.parse(text);
 
-    // Oblicz makra z bazy
+    // Oblicz makra z bazy IŻŻ
     const makra = await przeliczMakraPosilku(nowyPosilek.skladniki);
     if (makra) Object.assign(nowyPosilek, makra);
     nowyPosilek.zrodlo_makr = makra ? 'baza' : 'ai';
+
+    // Skaluj nowy posiłek do kaloryczności starego
+    // (zachowaj proporcje makro ale dopasuj do celu kalorycznego posiłku)
+    const targetKcal = posilek.kcal || 0;
+    const aktualneKcal = nowyPosilek.kcal || 0;
+    if (targetKcal > 0 && aktualneKcal > 0 && Math.abs(aktualneKcal - targetKcal) / targetKcal > 0.15) {
+      const mnoznik = targetKcal / aktualneKcal;
+      nowyPosilek.kcal = Math.round(aktualneKcal * mnoznik);
+      nowyPosilek.bialko_g    = Math.round((nowyPosilek.bialko_g    || 0) * mnoznik * 10) / 10;
+      nowyPosilek.tluszcze_g  = Math.round((nowyPosilek.tluszcze_g  || 0) * mnoznik * 10) / 10;
+      nowyPosilek.weglowodany_g = Math.round((nowyPosilek.weglowodany_g || 0) * mnoznik * 10) / 10;
+      nowyPosilek.blonnik_g   = Math.round((nowyPosilek.blonnik_g   || 0) * mnoznik * 10) / 10;
+      // Skaluj mikroskładniki
+      const mikroPola = ['wapn_mg','fosfor_mg','magnez_mg','potas_mg','sod_mg','zelazo_mg','cynk_mg','omega3_g','vit_c_mg','vit_d_ug','vit_b12_ug','folany_ug','selen_ug','jod_ug','nas_g'];
+      mikroPola.forEach(f => {
+        if (nowyPosilek[f]) nowyPosilek[f] = Math.round(nowyPosilek[f] * mnoznik * 10) / 10;
+      });
+    }
 
     // Podmień w danych
     const idx = dzien.posilki.indexOf(posilek);
@@ -3416,19 +3629,42 @@ Zwróć TYLKO JSON:
     // Aktualizuj sumę kcal w headerze dnia
     if (card?._aktualizujHeader) card._aktualizujHeader();
 
-    // Aktualizuj zbiorczy mikropanel dnia jeśli istnieje
+    // Aktualizuj zbiorczy mikropanel dnia — przerenderuj HTML
     const dayCard = mealEl.closest('.day-card');
     if (dayCard) {
       const mikroDniaEl = dayCard.querySelector('.mikro-dnia-panel');
       if (mikroDniaEl) {
-        const mikroPola = ['wapn_mg','fosfor_mg','magnez_mg','potas_mg','sod_mg','zelazo_mg','cynk_mg','omega3_g','blonnik_g','vit_c_mg','vit_d_ug','vit_b12_ug','folany_ug','selen_ug','jod_ug','nas_g'];
+        const mikroPola = ['wapn_mg','fosfor_mg','magnez_mg','potas_mg','sod_mg','zelazo_mg','cynk_mg','omega3_g','blonnik_g'];
         const sumDnia = {};
         dzien.posilki.forEach(p => mikroPola.forEach(f => { sumDnia[f] = (sumDnia[f]||0) + (p[f]||0); }));
-        // Odśwież etykiety w panelu dnia
-        mikroPola.forEach(f => {
-          const el = mikroDniaEl.querySelector(`[data-mikro="${f}"]`);
-          if (el) el.textContent = Math.round((sumDnia[f]||0) * 10) / 10;
-        });
+        const r1m = v => Math.round(v * 10) / 10;
+        const caP = sumDnia.fosfor_mg > 1 ? (sumDnia.wapn_mg / sumDnia.fosfor_mg).toFixed(2) : '—';
+        const caPColor = sumDnia.fosfor_mg > 1
+          ? (Math.abs(sumDnia.wapn_mg/sumDnia.fosfor_mg - 1) < 0.3 ? '#34d399' : '#fb923c')
+          : 'var(--text2)';
+        mikroDniaEl.innerHTML = `
+          <div style="display:flex;flex-wrap:wrap;gap:6px;">
+            ${sumDnia.wapn_mg   > 0 ? `<span style="padding:3px 8px;border-radius:12px;background:rgba(52,211,153,0.1);color:#6ee7b7">Ca: ${Math.round(sumDnia.wapn_mg)}mg</span>` : ''}
+            ${sumDnia.fosfor_mg > 0 ? `<span style="padding:3px 8px;border-radius:12px;background:rgba(52,211,153,0.1);color:#6ee7b7">P: ${Math.round(sumDnia.fosfor_mg)}mg</span>` : ''}
+            ${sumDnia.wapn_mg > 0 && sumDnia.fosfor_mg > 1 ? `<span style="padding:3px 8px;border-radius:12px;background:rgba(52,211,153,0.08);color:${caPColor};font-weight:600">Ca:P = ${caP}</span>` : ''}
+            ${sumDnia.magnez_mg > 0 ? `<span style="padding:3px 8px;border-radius:12px;background:rgba(124,106,247,0.1);color:#a78bfa">Mg: ${Math.round(sumDnia.magnez_mg)}mg</span>` : ''}
+            ${sumDnia.potas_mg  > 0 ? `<span style="padding:3px 8px;border-radius:12px;background:rgba(124,106,247,0.1);color:#a78bfa">K: ${Math.round(sumDnia.potas_mg)}mg</span>` : ''}
+            ${sumDnia.sod_mg    > 0 ? `<span style="padding:3px 8px;border-radius:12px;background:rgba(251,146,60,0.1);color:#fb923c">Na: ${Math.round(sumDnia.sod_mg)}mg</span>` : ''}
+            ${sumDnia.zelazo_mg > 0 ? `<span style="padding:3px 8px;border-radius:12px;background:rgba(251,146,60,0.1);color:#fb923c">Fe: ${r1m(sumDnia.zelazo_mg)}mg</span>` : ''}
+            ${sumDnia.cynk_mg   > 0 ? `<span style="padding:3px 8px;border-radius:12px;background:rgba(251,146,60,0.1);color:#fb923c">Zn: ${r1m(sumDnia.cynk_mg)}mg</span>` : ''}
+            ${sumDnia.omega3_g  > 0 ? `<span style="padding:3px 8px;border-radius:12px;background:rgba(96,165,250,0.1);color:#60a5fa">ω-3: ${r1m(sumDnia.omega3_g)}g</span>` : ''}
+            ${sumDnia.blonnik_g > 0 ? `<span style="padding:3px 8px;border-radius:12px;background:rgba(96,165,250,0.1);color:#60a5fa">Błon: ${r1m(sumDnia.blonnik_g)}g</span>` : ''}
+          </div>`;
+      }
+    }
+
+    // Aktualizuj globalny panel mikroskładników (na górze wyników)
+    if (currentResult) {
+      const staryPanel = document.getElementById('mikroPanelGlobalny');
+      if (staryPanel) {
+        const nowyPanel = renderMikroPanel(json, currentResult.params);
+        nowyPanel.id = 'mikroPanelGlobalny';
+        staryPanel.replaceWith(nowyPanel);
       }
     }
 
@@ -4794,6 +5030,30 @@ Zwróć TYLKO JSON:
   for (const pole of mikro_pola) {
     json.mikro[pole] = Math.round((suma[pole]||0) / liczbaDni * 10) / 10;
   }
+
+  // ============================================================
+  // ŁADUNEK GLIKEMICZNY — obliczany matematycznie z bazy IŻŻ
+  // ŁG = Σ(IG_składnika × węglowodany_składnika_g / 100) per posiłek
+  // Źródło: Foster-Powell et al., Am J Clin Nutr 2002
+  // ============================================================
+  let lgSuma = 0, lgPosilkow = 0;
+  for (const dzien of (json.dni||[])) {
+    for (const posilek of (dzien.posilki||[])) {
+      const lgPosilku = (posilek.skladniki_dane||[]).reduce((s, sk) => {
+        const prod = FOOD_DB[sk.nazwa];
+        if (!prod || !prod.ig || prod.ig === 0) return s;
+        const wegl100g = prod.w || 0;
+        const gramatura = sk.gramatura || 0;
+        return s + (prod.ig * wegl100g * gramatura / 10000);
+      }, 0);
+      if (lgPosilku > 0) { lgSuma += lgPosilku; lgPosilkow++; }
+      posilek.lg = Math.round(lgPosilku);
+    }
+  }
+  // Średni ŁG posiłku i dzienny
+  json.mikro.lg_posilku = lgPosilkow > 0 ? Math.round(lgSuma / lgPosilkow) : 0;
+  json.mikro.lg_dzien   = lgPosilkow > 0 ? Math.round(lgSuma / liczbaDni)  : 0;
+
   json._kalibracja = { skalowano: skalowanoDni, regenerowano: regenerowanoDni, korekcjaMakro: korektaMakroDni, kalibrowano: kalibrowanoDni };
 
   return json;
@@ -4931,15 +5191,19 @@ function getNormy(gender, age) {
   const mode = getChipVal('modeChips') || 'standard';
   const ciaza = mode === 'ciaza';
   const laktacja = mode === 'laktacja';
+  // Normy zróżnicowane wg płci, wieku i trybu (IŻŻ 2017 / EFSA)
+  const senior = (age || 0) >= 65;
+  const ibsMode = disease === 'ibs';
   return {
     kcal:    ciaza ? 2300 : laktacja ? 2500 : (k ? 2000 : 2500),
     bialko:  ciaza ? 70   : laktacja ? 75   : (k ? 55 : 65),
-    blonnik: 25,
-    wapn:    ciaza ? 1200 : laktacja ? 1300 : 1000,
+    // Przy IBS błonnik ograniczony do 15g (faza eliminacji low-FODMAP)
+    blonnik: ibsMode ? 15 : (k ? 25 : 30),
+    wapn:    ciaza ? 1200 : laktacja ? 1300 : (senior ? 1200 : 1000),
     zelazo:  ciaza ? 27   : laktacja ? 10   : (k ? 18 : 10),
     magnez:  ciaza ? 360  : laktacja ? 320  : (k ? 320 : 420),
-    vit_c:   ciaza ? 85   : laktacja ? 120  : 75,
-    vit_d:   15,
+    vit_c:   ciaza ? 85   : laktacja ? 120  : (k ? 75 : 90),
+    vit_d:   senior ? 20  : 15,
     vit_b12: ciaza ? 2.6  : laktacja ? 2.8  : 2.4,
     fol:     ciaza ? 600  : laktacja ? 500  : 400,
     cynk:    ciaza ? 12   : laktacja ? 13   : (k ? 8 : 11),
@@ -4949,6 +5213,9 @@ function getNormy(gender, age) {
     jod:     ciaza ? 220  : laktacja ? 290  : 150,
     nas:     k ? 20 : 25,
     omega3:  ciaza ? 2.0  : laktacja ? 2.0  : 1.6,
+    miedz:   ciaza ? 1.3  : laktacja ? 1.3  : 0.9,
+    mangan:  k ? 1.8 : 2.3,
+    vit_k:   k ? 90 : 120,
   };
 }
 
@@ -4959,31 +5226,37 @@ function renderMikroPanel(json, params) {
   const r = v => Math.round(v * 10) / 10;
 
   // Indeks glikemiczny jadłospisu
+  // Indeks i ładunek glikemiczny jadłospisu
   const igDnia = m.ig || 0;
+  const lgDzien = m.lg_dzien || 0;
+  const lgPosilku = m.lg_posilku || 0;
   const igKlasa = igDnia === 0 ? '' : igDnia < 40 ? 'ok' : igDnia < 70 ? 'high' : 'warn';
   const igOpis = igDnia === 0 ? 'brak danych' : igDnia < 40 ? 'Niski ✅' : igDnia < 70 ? 'Średni ⚠️' : 'Wysoki ❌';
+  // ŁG: <10 niski, 10-19 średni, ≥20 wysoki (per posiłek, Harvard School of Public Health)
+  const lgKlasa = lgPosilku === 0 ? '' : lgPosilku < 10 ? 'ok' : lgPosilku < 20 ? 'high' : 'warn';
+  const lgOpis  = lgPosilku === 0 ? 'brak danych' : lgPosilku < 10 ? 'Niski ✅' : lgPosilku < 20 ? 'Średni ⚠️' : 'Wysoki ❌';
 
   const dane = [
     // Makro kluczowe
-    { label:'Błonnik',     war: r(json.blonnik_g||0),  norma: n.blonnik, jedn:'g',  info:'min 25g/dzień' },
+    { label:'Błonnik',     war: r(json.blonnik_g||0),  norma: n.blonnik, jedn:'g',  info:'min 25-30g/dzień (IŻŻ)' },
     // Minerały
-    { label:'Wapń',        war: r(m.wapn_mg||0),       norma: n.wapn,    jedn:'mg', info:'kości, zęby' },
-    { label:'Żelazo',      war: r(m.zelazo_mg||0),     norma: n.zelazo,  jedn:'mg', info:'krwinki, energia' },
-    { label:'Magnez',      war: r(m.magnez_mg||0),     norma: n.magnez,  jedn:'mg', info:'układ nerwowy' },
-    { label:'Fosfor',      war: r(m.fosfor_mg||0),     norma: n.fosfor,  jedn:'mg', info:'kości, DNA' },
-    { label:'Selen',       war: r(m.selen_ug||0),      norma: n.selen,   jedn:'µg', info:'tarczyca, odporność' },
-    { label:'Jod',         war: r(m.jod_ug||0),        norma: n.jod,     jedn:'µg', info:'tarczyca' },
-    { label:'Cynk',        war: r(m.cynk_mg||0),       norma: n.cynk,    jedn:'mg', info:'odporność, skóra' },
+    { label:'Wapń',        war: r(m.wapn_mg||0),       norma: n.wapn,    jedn:'mg', info:'kości, zęby, nerwy' },
+    { label:'Żelazo',      war: r(m.zelazo_mg||0),     norma: n.zelazo,  jedn:'mg', info:'krwinki czerwone, energia' },
+    { label:'Magnez',      war: r(m.magnez_mg||0),     norma: n.magnez,  jedn:'mg', info:'układ nerwowy, mięśnie' },
+    { label:'Fosfor',      war: r(m.fosfor_mg||0),     norma: n.fosfor,  jedn:'mg', info:'kości, DNA, ATP' },
+    { label:'Selen',       war: r(m.selen_ug||0),      norma: n.selen,   jedn:'µg', info:'tarczyca, odporność, antyoksydant' },
+    { label:'Jod',         war: r(m.jod_ug||0),        norma: n.jod,     jedn:'µg', info:'tarczyca, metabolizm' },
+    { label:'Cynk',        war: r(m.cynk_mg||0),       norma: n.cynk,    jedn:'mg', info:'odporność, skóra, rany' },
     // Witaminy
-    { label:'Wit. C',      war: r(m.vit_c_mg||0),      norma: n.vit_c,   jedn:'mg', info:'odporność, kolagen' },
-    { label:'Wit. D',      war: r(m.vit_d_ug||0),      norma: n.vit_d,   jedn:'µg', info:'kości, odporność' },
-    { label:'Wit. B12',    war: r(m.vit_b12_ug||0),    norma: n.vit_b12, jedn:'µg', info:'nerwy, krwinki' },
-    { label:'Kw. foliowy', war: r(m.folany_ug||0),     norma: n.fol,     jedn:'µg', info:'DNA, ciąża' },
-    // Tłuszcze jakościowe (odwrócone - im mniej NAS tym lepiej)
-    { label:'Tł. nasycone',war: r(m.nas_g||0),         norma: n.nas,     jedn:'g',  info:'max dzienna norma', odwrocone: true },
-    { label:'Omega-3',     war: r(m.omega3_g||0),      norma: n.omega3,  jedn:'g',  info:'serce, mózg' },
+    { label:'Wit. C',      war: r(m.vit_c_mg||0),      norma: n.vit_c,   jedn:'mg', info:'odporność, kolagen, żelazo niehemowe' },
+    { label:'Wit. D',      war: r(m.vit_d_ug||0),      norma: n.vit_d,   jedn:'µg', info:'kości, odporność, hormony' },
+    { label:'Wit. B12',    war: r(m.vit_b12_ug||0),    norma: n.vit_b12, jedn:'µg', info:'nerwy, krwinki, DNA' },
+    { label:'Kw. foliowy', war: r(m.folany_ug||0),     norma: n.fol,     jedn:'µg', info:'DNA, ciąża, serce' },
+    // Tłuszcze jakościowe
+    { label:'Tł. nasycone',war: r(m.nas_g||0),         norma: n.nas,     jedn:'g',  info:'max dzienna norma (WHO)', odwrocone: true },
+    { label:'Omega-3',     war: r(m.omega3_g||0),      norma: n.omega3,  jedn:'g',  info:'serce, mózg, stan zapalny' },
     // Sód
-    { label:'Sód',         war: r(m.sod_mg||0),        norma: n.sod,     jedn:'mg', info:'max 2000mg (WHO)', odwrocone: true },
+    { label:'Sód',         war: r(m.sod_mg||0),        norma: n.sod,     jedn:'mg', info:'max 2000mg/dzień (WHO)', odwrocone: true },
   ];
 
   const panel = document.createElement('div');
@@ -5042,15 +5315,24 @@ function renderMikroPanel(json, params) {
       ? `⚠️ Możliwe niedobory (${badCount} skł.) — skonsultuj z dietetykiem`
       : '📊 Większość norm orientacyjnie pokryta';
 
-  const igBadge = igDnia > 0
-    ? `<div style="margin-bottom:12px;padding:8px 12px;background:rgba(124,106,247,0.1);border-radius:10px;border:1px solid var(--border);">
-        <span style="font-size:11px;color:var(--text2);">Indeks glikemiczny jadłospisu: </span>
-        <span style="font-size:13px;font-weight:700;" class="mikro-val ${igKlasa}">${igDnia} — ${igOpis}</span>
+  const igBadge = (igDnia > 0 || lgDzien > 0)
+    ? `<div style="margin-bottom:12px;padding:8px 12px;background:rgba(124,106,247,0.1);border-radius:10px;border:1px solid var(--border);display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        ${igDnia > 0 ? `<div><span style="font-size:11px;color:var(--text2);">Śr. IG: </span><span style="font-size:13px;font-weight:700;" class="mikro-val ${igKlasa}">${igDnia} — ${igOpis}</span></div>` : ''}
+        ${lgDzien > 0 ? `<div><span style="font-size:11px;color:var(--text2);">ŁG dzienny: </span><span style="font-size:13px;font-weight:700;" class="mikro-val ${lgKlasa}">${lgDzien}</span><span style="font-size:10px;color:var(--text2);margin-left:4px;">(per posiłek: ${lgPosilku} — ${lgOpis})</span></div>` : ''}
+        ${lgDzien > 0 ? `<div style="font-size:9px;color:var(--text2);opacity:0.6;width:100%">ŁG: &lt;10 niski · 10–19 średni · ≥20 wysoki (Harvard SPH) · obliczony z bazy IŻŻ</div>` : ''}
+      </div>` : '';
+
+  // 3. Ostrzeżenie warfaryna + wit. K
+  const warfarynAlert = (params.disease === 'hipercholesterolemia' || (params.wytyczneKliniczne||'').toLowerCase().includes('warfaryn') || (params.wytyczneKliniczne||'').toLowerCase().includes('acenokumarol'))
+    ? `<div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:11px;">
+        <strong style="color:#f87171">⚠️ Witamina K a leki przeciwzakrzepowe</strong><br>
+        <span style="color:var(--text2)">Przy stosowaniu warfaryny lub acenokumarolu utrzymuj stałe, przewidywalne spożycie wit. K. Nagłe zmiany (zielone warzywa liściaste) mogą zaburzać INR. Skonsultuj dietę z lekarzem prowadzącym.</span>
       </div>` : '';
 
   panel.innerHTML = `
     <div class="mikro-title">🔬 Analiza mikroskładników — ${tytul}</div>
     <div style="font-size:10px;color:var(--text2);margin-bottom:10px;opacity:0.6">Wartości orientacyjne / dzień · Linia = 100% normy IŻŻ/WHO · Dane z bazy IŻŻ/USDA · Najedź = info</div>
+    ${warfarynAlert}
     ${igBadge}
     ${rowsHtml}
     ${badgesHtml ? `<div class="mikro-status-row">${badgesHtml}</div>` : '<div class="mikro-status-row"><span class="mikro-badge ok">✅ Wszystkie normy spełnione</span></div>'}

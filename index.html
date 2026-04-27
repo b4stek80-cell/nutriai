@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#1a1a2e">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<title>jedzAI — Generator Planów Żywieniowych</title>
+<title>NutriAI — Generator Jadłospisów</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -794,11 +794,12 @@
 
 <div class="header">
   <div>
-    <div class="header-title">jedzAI</div>
-    <div class="header-sub">Generator Planów Żywieniowych</div>
+    <div class="header-title">NutriAI</div>
+    <div class="header-sub">
+      <a href="https://jedzai.pl" target="_blank" style="color:var(--text2);text-decoration:none;font-size:11px;">jedzai.pl</a>
+    </div>
   </div>
-  <div id="auth-area" style="display:flex;align-items:center;gap:8px;">
-    <button id="btnUpgrade" onclick="pokazModalPremium()" style="font-size:11px;padding:4px 12px;background:linear-gradient(135deg,#7c6af7,#a78bfa);color:#fff;border:none;border-radius:14px;cursor:pointer;font-weight:600;white-space:nowrap;">⭐ Upgrade</button>
+  <div id="auth-area">
     <button id="btn-login" class="auth-btn" onclick="handleLogin()">Zaloguj</button>
     <div id="user-info">
       <img id="user-avatar" class="user-avatar" src="" alt="avatar">
@@ -1101,7 +1102,7 @@
     <div class="section-label">📥 Import z pliku</div>
     <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px;">
       <p style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:12px;">
-        Możesz zaimportować produkty z pliku JSON (format jedzAI) lub CSV (format USDA). <strong style="color:var(--text)">Pełną bazę USDA</strong> można pobrać za darmo z fdc.nal.usda.gov/download-data
+        Możesz zaimportować produkty z pliku JSON (format NutriAI) lub CSV (format USDA). <strong style="color:var(--text)">Pełną bazę USDA</strong> można pobrać za darmo z fdc.nal.usda.gov/download-data
       </p>
       <div style="display:flex;gap:8px;margin-bottom:10px;">
         <label style="flex:1;padding:11px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--accent2);text-align:center;cursor:pointer;">
@@ -1169,7 +1170,7 @@ const apiKey = '';
 
 // ─── Supabase Auth ─────────────────────────────────────────────────────────
 const SUPABASE_URL = 'https://tiftqmjsmwuxmguxadve.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_wEvl2SRdcZUf1T3WlUCcsA_QojvnLYj';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRpZnRxbWpzbXd1eG1ndXhhZHZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxMzU0MjIsImV4cCI6MjA5MjcxMTQyMn0.xBGPAC_a0G11qJSy9XMbGtPOFgngg84pfoCTWrxudfY';
 
 const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let currentUser = null;
@@ -1181,17 +1182,10 @@ let isPremium = false;
 _supabase.auth.onAuthStateChange((_event, session) => {
   currentSession = session;
   currentUser = session?.user ?? null;
-  isPremium = false;
+  isPremium = false; // reset przy każdej zmianie auth
   aktualizujLimitInfo();
+  if (currentUser) pobierzStatusSubskrypcji();
   updateAuthUI();
-  if (currentUser) {
-    pobierzStatusSubskrypcji();
-    // Po powrocie z logowania — dokończ checkout jeśli był pending
-    if (sessionStorage.getItem('nutriai_pending_checkout')) {
-      sessionStorage.removeItem('nutriai_pending_checkout');
-      setTimeout(rozpocznijPlatnosc, 800);
-    }
-  }
 });
 
 function updateAuthUI() {
@@ -1284,8 +1278,6 @@ async function pobierzStatusSubskrypcji() {
     aktualizujLimitInfo();
     const badge = document.getElementById('premiumBadge');
     if (badge) badge.style.display = isPremium ? 'inline-block' : 'none';
-    const btnUpgrade = document.getElementById('btnUpgrade');
-    if (btnUpgrade) btnUpgrade.style.display = isPremium ? 'none' : '';
   } catch(e) {
     console.warn('Nie można pobrać statusu subskrypcji:', e.message);
   }
@@ -1345,13 +1337,14 @@ function zamknijModalPremium() {
 
 async function rozpocznijPlatnosc() {
   if (!currentUser) {
-    sessionStorage.setItem('nutriai_pending_checkout', '1');
-    showToast('⚠️ Zaloguj się — zaraz wrócimy do płatności');
+    zamknijModalPremium();
+    showToast('⚠️ Zaloguj się żeby kupić Premium');
     await handleLogin();
     return;
   }
   const btn = document.getElementById('btnKupPremium');
-  if (btn) { btn.textContent = 'Przekierowuję do Stripe...'; btn.disabled = true; }
+  btn.textContent = 'Przekierowuję do Stripe...';
+  btn.disabled = true;
   try {
     const res = await fetch(`${BACKEND_URL}/create-checkout`, {
       method: 'POST',
@@ -1362,11 +1355,13 @@ async function rozpocznijPlatnosc() {
       window.location.href = data.url;
     } else {
       showToast('❌ Błąd płatności: ' + (data.error || 'spróbuj ponownie'));
-      if (btn) { btn.textContent = 'Kup Premium'; btn.disabled = false; }
+      btn.textContent = 'Kup Premium';
+      btn.disabled = false;
     }
   } catch (e) {
-    showToast('❌ Błąd połączenia: ' + e.message);
-    if (btn) { btn.textContent = 'Kup Premium'; btn.disabled = false; }
+    showToast('❌ Błąd połączenia');
+    btn.textContent = 'Kup Premium';
+    btn.disabled = false;
   }
 }
 
@@ -2381,7 +2376,7 @@ function renderResult(json) {
   printHeader.className = 'print-header';
   const p = json;
   printHeader.innerHTML = `
-    <h1>🥗 jedzAI — Plan Żywieniowy</h1>
+    <h1>🥗 NutriAI — Plan Żywieniowy</h1>
     <p>Wygenerowano: ${new Date().toLocaleDateString('pl')} &nbsp;|&nbsp; ${p.kcal_dziennie} kcal/dzień &nbsp;|&nbsp; Białko: ${r1(p.bialko_g)}g &nbsp;|&nbsp; Tłuszcze: ${r1(p.tluszcze_g)}g &nbsp;|&nbsp; Węglowodany: ${r1(p.weglowodany_g)}g</p>`;
   area.appendChild(printHeader);
 
@@ -2758,12 +2753,17 @@ function renderResult(json) {
   }
 
   // Ko-fi
-  const kofi = document.createElement('a');
-  kofi.href = 'https://ko-fi.com/b4stek';
-  kofi.target = '_blank';
-  kofi.className = 'kofi-btn';
-  kofi.innerHTML = '☕ Postaw mi kawę na Ko-fi';
-  area.appendChild(kofi);
+  const promoBtn = document.createElement('a');
+  promoBtn.href = 'https://jedzai.pl';
+  promoBtn.target = '_blank';
+  promoBtn.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;margin-top:24px;padding:16px 20px;background:linear-gradient(135deg,rgba(124,106,247,0.15),rgba(52,211,153,0.08));border:1px solid rgba(124,106,247,0.3);border-radius:var(--radius);text-decoration:none;transition:opacity 0.2s;';
+  promoBtn.innerHTML = `
+    <div>
+      <div style="font-size:13px;font-weight:600;color:var(--accent2);margin-bottom:3px;">✨ Plan Premium — 19 zł/mies</div>
+      <div style="font-size:11px;color:var(--text2);">Nielimitowane jadłospisy · Wszystkie funkcje · Anuluj kiedy chcesz</div>
+    </div>
+    <div style="font-size:13px;font-weight:700;color:#fff;background:var(--accent);padding:8px 14px;border-radius:10px;white-space:nowrap;flex-shrink:0;">Kup Premium →</div>`;
+  area.appendChild(promoBtn);
 
   area.classList.add('visible');
   area.style.paddingBottom = '30px';
@@ -2888,7 +2888,7 @@ function exportToFile() {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>jedzAI — Plan Żywieniowy${pacjent ? ' · ' + pacjent : ''}</title>
+<title>NutriAI — Plan Żywieniowy${pacjent ? ' · ' + pacjent : ''}</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: Arial, 'Segoe UI', sans-serif; max-width: 820px; margin: 0 auto; padding: 24px; color: #222; background: #fff; font-size: 13px; }
@@ -2983,7 +2983,7 @@ function exportToFile() {
     <div class="brand">
       <div class="brand-logo">🥗</div>
       <div>
-        <div class="brand-name">jedzAI</div>
+        <div class="brand-name">NutriAI</div>
         <div class="brand-sub">Generator Planów Żywieniowych</div>
       </div>
     </div>
@@ -3064,8 +3064,8 @@ function exportToFile() {
   <!-- STOPKA -->
   <div class="footer">
     <div>
-      <div class="footer-brand">jedzAI</div>
-      <div>jedzai.pl &nbsp;·&nbsp; Dane: IŻŻ 2017 / USDA FoodData Central &nbsp;·&nbsp; Algorytm: Mifflin-St Jeor</div>
+      <div class="footer-brand">NutriAI</div>
+      <div>nutriai.app &nbsp;·&nbsp; Dane: IŻŻ 2017 / USDA FoodData Central &nbsp;·&nbsp; Algorytm: Mifflin-St Jeor</div>
     </div>
     <div class="disclaimer">Plan żywieniowy jest inspiracją dietetyczną i nie stanowi zalecenia medycznego. Przy schorzeniach skonsultuj z dyplomowanym dietetykiem.</div>
   </div>
@@ -3249,7 +3249,7 @@ function exportShoppingList() {
   });
   if (!sekcje.length) { showToast('⚠️ Brak listy zakupów'); return; }
   const date = new Date().toLocaleDateString('pl');
-  const text = `LISTA ZAKUPÓW — jedzAI\nData: ${date}\n${'='.repeat(30)}${sekcje.join('\n')}\n\n— wygenerowano przez jedzAI`;
+  const text = `LISTA ZAKUPÓW — NutriAI\nData: ${date}\n${'='.repeat(30)}${sekcje.join('\n')}\n\n— wygenerowano przez NutriAI`;
   const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
@@ -3271,7 +3271,7 @@ async function kopiujListeZakupow() {
     }
   });
   if (!linie.length) { showToast('⚠️ Brak listy zakupów'); return; }
-  const text = `🛒 Lista zakupów jedzAI\n${linie.join('\n')}`;
+  const text = `🛒 Lista zakupów NutriAI\n${linie.join('\n')}`;
   try {
     await navigator.clipboard.writeText(text);
     showToast('📋 Skopiowano do schowka!');
@@ -3802,9 +3802,9 @@ function przeliczPorcje(posilekNazwa, dzienIdx, posilekIdx, mnoznik) {
 
 function shareResult() {
   if (!currentResult) return;
-  const text = `Mój plan żywienia jedzAI:\n${currentResult.json.kcal_dziennie} kcal/dzień\nBiałko: ${currentResult.json.bialko_g}g | Tłuszcze: ${currentResult.json.tluszcze_g}g | Węglowodany: ${currentResult.json.weglowodany_g}g\n\nWygenerowano przez jedzAI 🌿`;
+  const text = `Mój plan żywienia NutriAI:\n${currentResult.json.kcal_dziennie} kcal/dzień\nBiałko: ${currentResult.json.bialko_g}g | Tłuszcze: ${currentResult.json.tluszcze_g}g | Węglowodany: ${currentResult.json.weglowodany_g}g\n\nWygenerowano przez NutriAI 🌿`;
   if (navigator.share) {
-    navigator.share({ title: 'jedzAI — Mój jadłospis', text });
+    navigator.share({ title: 'NutriAI — Mój jadłospis', text });
   } else {
     navigator.clipboard.writeText(text);
     showToast('📋 Skopiowano do schowka');
@@ -4500,7 +4500,7 @@ async function importujPlik(input) {
       const parsed = JSON.parse(text);
       produkty = Array.isArray(parsed) ? parsed : Object.entries(parsed).map(([nazwa,dane]) => ({nazwa,...dane}));
     } else if (file.name.endsWith('.csv')) {
-      // Prosty parser CSV (format USDA lub jedzAI)
+      // Prosty parser CSV (format USDA lub NutriAI)
       const lines = text.split('\n');
       const headers = lines[0].split(',').map(h => h.trim().replace(/"/g,'').toLowerCase());
       produkty = lines.slice(1).filter(l=>l.trim()).map(line => {
